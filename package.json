@@ -1,0 +1,22 @@
+{
+  "name": "rent-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "seed": "node scripts/seed-firestore.mjs",
+    "deploy": "astro build && firebase deploy --only hosting"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.2.1",
+    "firebase": "^12.17.1",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "firebase-admin": "^14.2.0"
+  }
+}

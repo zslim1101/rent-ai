@@ -1,0 +1,50 @@
+---
+import '../styles/global.css';
+import { hasSampleData } from '../lib/data';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const sample = await hasSampleData();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-screen bg-stone-50 text-stone-900 antialiased">
+    {
+      sample && (
+        <div class="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900">
+          <strong class="font-semibold">Sample data.</strong> These figures are placeholders, not real
+          rents. Replace <code class="font-mono">data/buildings.json</code> to remove this notice.
+        </div>
+      )
+    }
+
+    <header class="border-b border-stone-200 bg-white">
+      <div class="mx-auto flex max-w-5xl items-baseline justify-between px-4 py-5">
+        <a href="/" class="text-lg font-semibold tracking-tight">Rent<span class="text-emerald-600">AI</span></a>
+        <p class="text-sm text-stone-500">Ara Damansara &amp; Kelana Jaya</p>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-5xl px-4 py-10">
+      <slot />
+    </main>
+
+    <footer class="mt-16 border-t border-stone-200 bg-white">
+      <div class="mx-auto max-w-5xl px-4 py-6 text-sm text-stone-500">
+        <p>
+          Rent figures are medians computed from listing counts shown on each building. We link out to
+          the source listings rather than reproduce them.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,228 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getBuildings } from '../../lib/data';
+import type { Building } from '../../lib/types';
+import { myr, psf, sqft, furnishingLabel, isLowConfidence, LOW_CONFIDENCE_THRESHOLD } from '../../lib/format';
+
+export async function getStaticPaths() {
+  const buildings = await getBuildings();
+  return buildings.map((b) => ({ params: { slug: b.slug }, props: { building: b } }));
+}
+
+interface Props {
+  building: Building;
+}
+
+const { building } = Astro.props;
+const { facts, metrics, reviews, listings } = building;
+
+// A handful of reviews is an anecdote, not a rating. Show the themes, hold the score.
+const showReviewScore = reviews.count >= LOW_CONFIDENCE_THRESHOLD;
+
+const factRows = [
+  { label: 'Completed', value: building.completionYear ?? '—' },
+  { label: 'Total units', value: building.totalUnits?.toLocaleString('en-MY') ?? '—' },
+  { label: 'Maintenance fee', value: facts.maintenancePsf === null ? '—' : psf(facts.maintenancePsf) },
+  { label: 'Parking per unit', value: facts.parkingPerUnit ?? '—' },
+  { label: 'Lifts', value: facts.liftCount ?? '—' },
+  {
+    label: 'Units per lift',
+    value:
+      building.totalUnits && facts.liftCount ? Math.round(building.totalUnits / facts.liftCount) : '—',
+  },
+];
+---
+
+<Base title={`${building.name} — rent & building facts`}>
+  <a href="/" class="text-sm text-emerald-700 hover:underline">&larr; All buildings</a>
+
+  <header class="mt-4 mb-10">
+    <h1 class="text-3xl font-semibold tracking-tight">{building.name}</h1>
+    <p class="mt-1 text-stone-600">{building.address}</p>
+  </header>
+
+  <!-- Headline numbers -->
+  <section class="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <div class="rounded-lg border border-stone-200 bg-white p-4">
+      <div class="text-xs uppercase tracking-wide text-stone-500">Median rent</div>
+      <div class="mt-1 text-2xl font-semibold tabular-nums">{myr(metrics.medianRentMyr)}</div>
+    </div>
+    <div class="rounded-lg border border-stone-200 bg-white p-4">
+      <div class="text-xs uppercase tracking-wide text-stone-500">Per sqft</div>
+      <div class="mt-1 text-2xl font-semibold tabular-nums">{psf(metrics.medianPsf)}</div>
+    </div>
+    <div class="rounded-lg border border-stone-200 bg-white p-4">
+      <div class="text-xs uppercase tracking-wide text-stone-500">Walk to LRT</div>
+      <div class="mt-1 text-2xl font-semibold tabular-nums">
+        {facts.walkMinutesToStation === null ? '—' : `${facts.walkMinutesToStation} min`}
+      </div>
+      {facts.nearestStation && <div class="mt-1 text-xs text-stone-500">{facts.nearestStation}</div>}
+    </div>
+    <div class="rounded-lg border border-stone-200 bg-white p-4">
+      <div class="text-xs uppercase tracking-wide text-stone-500">Active listings</div>
+      <div class="mt-1 text-2xl font-semibold tabular-nums">{metrics.listingCount}</div>
+    </div>
+  </section>
+
+  {
+    isLowConfidence(metrics.listingCount) && (
+      <p class="mb-10 rounded-lg border border-stone-200 bg-stone-100 px-4 py-3 text-sm text-stone-600">
+        Based on fewer than {LOW_CONFIDENCE_THRESHOLD} listings, so treat these medians as indicative
+        rather than settled.
+      </p>
+    )
+  }
+
+  <!-- Building facts -->
+  <section class="mb-10">
+    <h2 class="mb-4 text-xl font-semibold tracking-tight">Building</h2>
+    <dl class="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border border-stone-200 bg-white p-5 sm:grid-cols-3">
+      {
+        factRows.map((row) => (
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-stone-500">{row.label}</dt>
+            <dd class="mt-1 tabular-nums">{row.value}</dd>
+          </div>
+        ))
+      }
+      <div class="col-span-2 sm:col-span-3">
+        <dt class="text-xs uppercase tracking-wide text-stone-500">Fibre providers</dt>
+        <dd class="mt-1">
+          {
+            facts.fibreProviders.length === 0 ? (
+              <span class="text-stone-400">Unknown</span>
+            ) : (
+              facts.fibreProviders.map((p) => (
+                <span class="mr-2 inline-block rounded bg-stone-100 px-2 py-0.5 text-sm capitalize">
+                  {p}
+                </span>
+              ))
+            )
+          }
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <!-- Rent by bedroom -->
+  <section class="mb-10">
+    <h2 class="mb-4 text-xl font-semibold tracking-tight">Rent by bedroom</h2>
+    <div class="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
+          <tr>
+            <th class="px-4 py-3 font-medium">Bedrooms</th>
+            <th class="px-4 py-3 font-medium">Median rent</th>
+            <th class="px-4 py-3 font-medium">Listings</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {
+            metrics.byBedroom.map((row) => (
+              <tr>
+                <td class="px-4 py-3">{row.beds} bed</td>
+                <td class="px-4 py-3 tabular-nums">{myr(row.medianRentMyr)}</td>
+                <td class="px-4 py-3 tabular-nums">
+                  {row.count}
+                  {isLowConfidence(row.count) && (
+                    <span class="ml-2 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500">
+                      low
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Reviews -->
+  <section class="mb-10">
+    <h2 class="mb-4 text-xl font-semibold tracking-tight">What residents say</h2>
+    <div class="rounded-lg border border-stone-200 bg-white p-5">
+      {
+        showReviewScore ? (
+          <p class="mb-4">
+            <span class="text-2xl font-semibold tabular-nums">{reviews.average.toFixed(1)}</span>
+            <span class="text-stone-500"> from {reviews.count} reviews</span>
+          </p>
+        ) : (
+          <p class="mb-4 text-sm text-stone-600">
+            Only {reviews.count} {reviews.count === 1 ? 'review' : 'reviews'} so far — too few to
+            average.
+          </p>
+        )
+      }
+
+      {
+        reviews.themes.length > 0 && (
+          <ul class="space-y-2">
+            {reviews.themes.map((theme) => (
+              <li class="flex items-baseline gap-3">
+                <span
+                  class:list={[
+                    'inline-block h-2 w-2 shrink-0 rounded-full',
+                    {
+                      'bg-emerald-500': theme.sentiment === 'positive',
+                      'bg-amber-400': theme.sentiment === 'mixed',
+                      'bg-stone-400': theme.sentiment === 'negative',
+                    },
+                  ]}
+                />
+                <span>{theme.label}</span>
+                <span class="text-sm text-stone-500">{theme.mentions} mentions</span>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </div>
+  </section>
+
+  <!-- Listings -->
+  <section>
+    <h2 class="mb-4 text-xl font-semibold tracking-tight">Listings</h2>
+    <div class="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+      <table class="w-full min-w-[38rem] text-left text-sm">
+        <thead class="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
+          <tr>
+            <th class="px-4 py-3 font-medium">Layout</th>
+            <th class="px-4 py-3 font-medium">Size</th>
+            <th class="px-4 py-3 font-medium">Furnishing</th>
+            <th class="px-4 py-3 font-medium">Rent</th>
+            <th class="px-4 py-3 font-medium">Source</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {
+            listings.map((l) => (
+              <tr class="hover:bg-stone-50">
+                <td class="px-4 py-3">
+                  {l.beds} bed &middot; {l.baths} bath
+                </td>
+                <td class="px-4 py-3 tabular-nums">{sqft(l.sqft)}</td>
+                <td class="px-4 py-3">{furnishingLabel[l.furnishing] ?? l.furnishing}</td>
+                <td class="px-4 py-3 tabular-nums">{myr(l.priceMyr)}</td>
+                <td class="px-4 py-3">
+                  <a
+                    href={l.sourceUrl}
+                    rel="noopener nofollow"
+                    target="_blank"
+                    class="capitalize text-emerald-700 hover:underline"
+                  >
+                    {l.source}
+                  </a>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-sm text-stone-500">
+      We show measurements and asking price only, and link out for the rest.
+    </p>
+  </section>
+</Base>

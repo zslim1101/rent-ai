@@ -1,0 +1,20 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Published building data — anyone may read, nobody may write from a client.
+    // Writes happen only through the seed script, which uses a service account
+    // and bypasses these rules.
+    match /buildings/{slug} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Everything else is closed. If a collection holding raw or unpublished data
+    // is added later, it stays private unless a rule above deliberately opens it.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,74 @@
+---
+import Base from '../layouts/Base.astro';
+import { getBuildings } from '../lib/data';
+import { myr, psf, isLowConfidence } from '../lib/format';
+
+const buildings = await getBuildings();
+const totalListings = buildings.reduce((sum, b) => sum + b.metrics.listingCount, 0);
+---
+
+<Base title="Rental directory — Ara Damansara & Kelana Jaya">
+  <section class="mb-10">
+    <h1 class="text-3xl font-semibold tracking-tight">Buildings in the cluster</h1>
+    <p class="mt-2 max-w-2xl text-stone-600">
+      {buildings.length} buildings, {totalListings} listings. Median rents, maintenance fees and walk
+      times to the LRT — the things listing portals do not tell you.
+    </p>
+  </section>
+
+  <div class="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+    <table class="w-full min-w-[46rem] text-left text-sm">
+      <thead class="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th class="px-4 py-3 font-medium">Building</th>
+          <th class="px-4 py-3 font-medium">Median rent</th>
+          <th class="px-4 py-3 font-medium">Per sqft</th>
+          <th class="px-4 py-3 font-medium">Maintenance</th>
+          <th class="px-4 py-3 font-medium">Walk to LRT</th>
+          <th class="px-4 py-3 font-medium">Listings</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {
+          buildings.map((b) => (
+            <tr class="hover:bg-stone-50">
+              <td class="px-4 py-3">
+                <a href={`/building/${b.slug}`} class="font-medium text-emerald-700 hover:underline">
+                  {b.name}
+                </a>
+                <div class="text-xs text-stone-500">{b.area}</div>
+              </td>
+              <td class="px-4 py-3 tabular-nums">{myr(b.metrics.medianRentMyr)}</td>
+              <td class="px-4 py-3 tabular-nums">{psf(b.metrics.medianPsf)}</td>
+              <td class="px-4 py-3 tabular-nums">
+                {b.facts.maintenancePsf === null ? (
+                  <span class="text-stone-400">—</span>
+                ) : (
+                  psf(b.facts.maintenancePsf)
+                )}
+              </td>
+              <td class="px-4 py-3 tabular-nums">
+                {b.facts.walkMinutesToStation === null ? (
+                  <span class="text-stone-400">—</span>
+                ) : (
+                  `${b.facts.walkMinutesToStation} min`
+                )}
+              </td>
+              <td class="px-4 py-3 tabular-nums">
+                {b.metrics.listingCount}
+                {isLowConfidence(b.metrics.listingCount) && (
+                  <span
+                    class="ml-2 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500"
+                    title="Fewer than 5 listings — treat the median as indicative only"
+                  >
+                    low
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+</Base>

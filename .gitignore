@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.astro/
+
+# Firebase admin credentials — never commit
+serviceAccount.json
+*-firebase-adminsdk-*.json
+
+# Local env
+.env
+.env.local
+
+.DS_Store
+
+# Local screenshots
+.shots/
