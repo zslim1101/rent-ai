@@ -6,6 +6,15 @@ Each building gets its own page with the rent people are asking, the monthly mai
 fee, how long it really takes to walk to the LRT, and what residents say about living
 there. One page per development.
 
+There are three pages:
+
+- **Buildings** — every building side by side, so you can compare them.
+- **Listings** — every available unit across all the buildings, which you can narrow down
+  by area, bedrooms, furnishing and price, and reorder by rent, size, price per square
+  foot, or walk to the station.
+- **A page for each building** — its facts, its rents broken down by bedroom count, what
+  residents say, and the units currently available in it.
+
 ---
 
 ## Before you start
@@ -208,7 +217,7 @@ under five, we don't show a score at all.
 | File or folder | What it's for |
 |---|---|
 | `data/buildings.json` | All the building information. This is the one you'll edit. |
-| `src/pages/` | The two page designs: the list, and the individual building page. |
+| `src/pages/` | The three page designs: the building list, the all-listings page, and the individual building page. |
 | `src/lib/` | The code that loads and formats the information. |
 | `scripts/seed-firestore.mjs` | Copies your file into the online database. |
 | `firestore.rules` | Says who can read and change the online information. |

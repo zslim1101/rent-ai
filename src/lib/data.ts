@@ -1,4 +1,4 @@
-import type { Building } from './types';
+import type { Building, Listing } from './types';
 import local from '../../data/buildings.json';
 
 /**
@@ -72,4 +72,30 @@ export async function getBuilding(slug: string): Promise<Building | undefined> {
 /** True while any row on the site is still placeholder data. */
 export async function hasSampleData(): Promise<boolean> {
   return (await getBuildings()).some((b) => b.sample);
+}
+
+/** One listing, carrying enough of its building to stand on its own in a list. */
+export interface ListingWithBuilding extends Listing {
+  buildingName: string;
+  buildingSlug: string;
+  area: string;
+  walkMinutesToStation: number | null;
+  /** Asking rent per square foot, which is how you compare unlike units. */
+  pricePsf: number;
+}
+
+/** Every listing across every building, flattened for the all-listings page. */
+export async function getAllListings(): Promise<ListingWithBuilding[]> {
+  const buildings = await getBuildings();
+
+  return buildings.flatMap((b) =>
+    b.listings.map((l) => ({
+      ...l,
+      buildingName: b.name,
+      buildingSlug: b.slug,
+      area: b.area,
+      walkMinutesToStation: b.facts.walkMinutesToStation,
+      pricePsf: l.sqft > 0 ? l.priceMyr / l.sqft : 0,
+    })),
+  );
 }

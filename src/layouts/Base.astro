@@ -28,9 +28,13 @@ const sample = await hasSampleData();
     }
 
     <header class="border-b border-stone-200 bg-white">
-      <div class="mx-auto flex max-w-5xl items-baseline justify-between px-4 py-5">
+      <div class="mx-auto flex max-w-5xl flex-wrap items-baseline gap-x-6 gap-y-2 px-4 py-5">
         <a href="/" class="text-lg font-semibold tracking-tight">Rent<span class="text-emerald-600">AI</span></a>
-        <p class="text-sm text-stone-500">Ara Damansara &amp; Kelana Jaya</p>
+        <nav class="flex gap-4 text-sm">
+          <a href="/" class="text-stone-600 hover:text-stone-900">Buildings</a>
+          <a href="/listings" class="text-stone-600 hover:text-stone-900">Listings</a>
+        </nav>
+        <p class="ml-auto text-sm text-stone-500">Ara Damansara &amp; Kelana Jaya</p>
       </div>
     </header>
 

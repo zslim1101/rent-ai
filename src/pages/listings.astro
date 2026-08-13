@@ -1,0 +1,215 @@
+---
+import Base from '../layouts/Base.astro';
+import { getAllListings } from '../lib/data';
+import { myr, psf, sqft, furnishingLabel } from '../lib/format';
+
+const listings = await getAllListings();
+
+const areas = [...new Set(listings.map((l) => l.area))].sort();
+const bedCounts = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b);
+---
+
+<Base title="All listings — Ara Damansara & Kelana Jaya">
+  <section class="mb-8">
+    <h1 class="text-3xl font-semibold tracking-tight">All listings</h1>
+    <p class="mt-2 max-w-2xl text-stone-600">
+      Every unit we know of across the cluster. Sort by rent per square foot to compare a small
+      furnished unit against a big bare one honestly.
+    </p>
+  </section>
+
+  <!-- Filters. These work on the rows already on the page, so nothing reloads. -->
+  <div class="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-stone-200 bg-white p-4">
+    <label class="flex flex-col gap-1">
+      <span class="text-xs uppercase tracking-wide text-stone-500">Area</span>
+      <select id="f-area" class="rounded border border-stone-300 px-2 py-1.5 text-sm">
+        <option value="">All areas</option>
+        {areas.map((a) => <option value={a}>{a}</option>)}
+      </select>
+    </label>
+
+    <label class="flex flex-col gap-1">
+      <span class="text-xs uppercase tracking-wide text-stone-500">Bedrooms</span>
+      <select id="f-beds" class="rounded border border-stone-300 px-2 py-1.5 text-sm">
+        <option value="">Any</option>
+        {bedCounts.map((b) => <option value={b}>{b} bed</option>)}
+      </select>
+    </label>
+
+    <label class="flex flex-col gap-1">
+      <span class="text-xs uppercase tracking-wide text-stone-500">Furnishing</span>
+      <select id="f-furnishing" class="rounded border border-stone-300 px-2 py-1.5 text-sm">
+        <option value="">Any</option>
+        <option value="furnished">Fully furnished</option>
+        <option value="partial">Partly furnished</option>
+        <option value="bare">Unfurnished</option>
+      </select>
+    </label>
+
+    <label class="flex flex-col gap-1">
+      <span class="text-xs uppercase tracking-wide text-stone-500">Max rent</span>
+      <input
+        id="f-max"
+        type="number"
+        step="100"
+        placeholder="No limit"
+        class="w-28 rounded border border-stone-300 px-2 py-1.5 text-sm"
+      />
+    </label>
+
+    <label class="flex flex-col gap-1">
+      <span class="text-xs uppercase tracking-wide text-stone-500">Sort by</span>
+      <select id="f-sort" class="rounded border border-stone-300 px-2 py-1.5 text-sm">
+        <option value="price-asc">Rent, lowest first</option>
+        <option value="price-desc">Rent, highest first</option>
+        <option value="psf-asc">Per sqft, lowest first</option>
+        <option value="sqft-desc">Size, largest first</option>
+        <option value="walk-asc">Walk to LRT, shortest first</option>
+      </select>
+    </label>
+
+    <button
+      id="f-reset"
+      type="button"
+      class="ml-auto rounded border border-stone-300 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-50"
+    >
+      Reset
+    </button>
+  </div>
+
+  <p id="count" class="mb-3 text-sm text-stone-500">{listings.length} listings</p>
+
+  <div class="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+    <table class="w-full min-w-[52rem] text-left text-sm">
+      <thead class="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th class="px-4 py-3 font-medium">Building</th>
+          <th class="px-4 py-3 font-medium">Layout</th>
+          <th class="px-4 py-3 font-medium">Size</th>
+          <th class="px-4 py-3 font-medium">Furnishing</th>
+          <th class="px-4 py-3 font-medium">Rent</th>
+          <th class="px-4 py-3 font-medium">Per sqft</th>
+          <th class="px-4 py-3 font-medium">LRT</th>
+          <th class="px-4 py-3 font-medium">Source</th>
+        </tr>
+      </thead>
+      <tbody id="rows" class="divide-y divide-stone-100">
+        {
+          listings.map((l) => (
+            <tr
+              class="hover:bg-stone-50"
+              data-area={l.area}
+              data-beds={l.beds}
+              data-furnishing={l.furnishing}
+              data-price={l.priceMyr}
+              data-sqft={l.sqft}
+              data-psf={l.pricePsf.toFixed(4)}
+              data-walk={l.walkMinutesToStation ?? 999}
+            >
+              <td class="px-4 py-3">
+                <a href={`/building/${l.buildingSlug}`} class="font-medium text-emerald-700 hover:underline">
+                  {l.buildingName}
+                </a>
+                <div class="text-xs text-stone-500">{l.area}</div>
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap">
+                {l.beds} bed &middot; {l.baths} bath
+              </td>
+              <td class="px-4 py-3 tabular-nums whitespace-nowrap">{sqft(l.sqft)}</td>
+              <td class="px-4 py-3 whitespace-nowrap">{furnishingLabel[l.furnishing] ?? l.furnishing}</td>
+              <td class="px-4 py-3 font-medium tabular-nums whitespace-nowrap">{myr(l.priceMyr)}</td>
+              <td class="px-4 py-3 tabular-nums whitespace-nowrap">{psf(l.pricePsf)}</td>
+              <td class="px-4 py-3 tabular-nums whitespace-nowrap">
+                {l.walkMinutesToStation === null ? (
+                  <span class="text-stone-400">—</span>
+                ) : (
+                  `${l.walkMinutesToStation} min`
+                )}
+              </td>
+              <td class="px-4 py-3">
+                <a
+                  href={l.sourceUrl}
+                  rel="noopener nofollow"
+                  target="_blank"
+                  class="capitalize text-emerald-700 hover:underline"
+                >
+                  {l.source}
+                </a>
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <p id="empty" class="mt-4 hidden text-sm text-stone-500">
+    Nothing matches those filters. Try widening one of them.
+  </p>
+</Base>
+
+<script>
+  // Every row is already in the page. This only hides, shows and reorders them,
+  // so filtering costs no network requests and works instantly.
+  const tbody = document.getElementById('rows') as HTMLTableSectionElement;
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const count = document.getElementById('count') as HTMLElement;
+  const empty = document.getElementById('empty') as HTMLElement;
+
+  const controls = {
+    area: document.getElementById('f-area') as HTMLSelectElement,
+    beds: document.getElementById('f-beds') as HTMLSelectElement,
+    furnishing: document.getElementById('f-furnishing') as HTMLSelectElement,
+    max: document.getElementById('f-max') as HTMLInputElement,
+    sort: document.getElementById('f-sort') as HTMLSelectElement,
+  };
+
+  const num = (row: HTMLElement, key: string) => Number(row.dataset[key]);
+
+  const sorters: Record<string, (a: HTMLElement, b: HTMLElement) => number> = {
+    'price-asc': (a, b) => num(a, 'price') - num(b, 'price'),
+    'price-desc': (a, b) => num(b, 'price') - num(a, 'price'),
+    'psf-asc': (a, b) => num(a, 'psf') - num(b, 'psf'),
+    'sqft-desc': (a, b) => num(b, 'sqft') - num(a, 'sqft'),
+    'walk-asc': (a, b) => num(a, 'walk') - num(b, 'walk'),
+  };
+
+  function apply() {
+    const max = Number(controls.max.value) || Infinity;
+    let visible = 0;
+
+    for (const row of rows) {
+      const match =
+        (!controls.area.value || row.dataset.area === controls.area.value) &&
+        (!controls.beds.value || row.dataset.beds === controls.beds.value) &&
+        (!controls.furnishing.value || row.dataset.furnishing === controls.furnishing.value) &&
+        num(row, 'price') <= max;
+
+      row.hidden = !match;
+      if (match) visible++;
+    }
+
+    for (const row of [...rows].sort(sorters[controls.sort.value])) {
+      tbody.appendChild(row);
+    }
+
+    count.textContent = `${visible} listing${visible === 1 ? '' : 's'}`;
+    empty.classList.toggle('hidden', visible > 0);
+  }
+
+  for (const el of Object.values(controls)) {
+    el.addEventListener('change', apply);
+  }
+  controls.max.addEventListener('input', apply);
+
+  document.getElementById('f-reset')?.addEventListener('click', () => {
+    controls.area.value = '';
+    controls.beds.value = '';
+    controls.furnishing.value = '';
+    controls.max.value = '';
+    controls.sort.value = 'price-asc';
+    apply();
+  });
+
+  apply();
+</script>
