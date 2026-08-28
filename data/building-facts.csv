@@ -1,0 +1,30 @@
+slug,name,area,address,completionYear,totalUnits,maintenancePsf,parkingPerUnit,liftCount,fibreProviders,nearestStation,walkMinutesToStation
+empire-city,Empire City,Damansara Perdana,"8 Jalan PJU 8/8, Damansara Perdana, Selangor",2015,,0.3,,,,Mutiara Damansara,28
+empire-damansara,Empire Damansara,Damansara Perdana,"Jalan PJU 8/8 Damansara Perdana, Petaling Jaya, Damansara Perdana, Selangor",2014,,,,,,Mutiara Damansara,26
+metropolitan-square,Metropolitan Square,Damansara Perdana,"Jalan PJU 8/1, Bandar Damansara Perdana, Damansara Perdana, Selangor",2013,1929,0.27,,,,,
+dterra-residences,D'Terra Residences,Damansara Perdana,"Damansara Perdana, Selangor",2026,767,,,,,Mutiara Damansara,39
+derica,D'Erica,Damansara Perdana,"Jalan PJU 8/8, Central Park Damansara, Damansara Perdana, Selangor",2024,1143,,,,,Mutiara Damansara,34
+dquince-residences,D'Quince Residences,Damansara Perdana,"Jalan PJU 8/8, Petaling Jaya, Bandar Damansara Perdana, Damansara Perdana, Selangor",2024,1310,,,,,Mutiara Damansara,42
+oasis-serviced-suites,Oasis Serviced Suites,Ara Damansara,"Jalan PJU 1A/7A, Ara Damansara, Selangor",2012,326,,,,,Ara Damansara,27
+dvine,D'Vine,Damansara Perdana,"Damansara Perdana, Selangor",2026,1400,,,,,,
+dclover-residences,D'Clover Residences,Damansara Perdana,"Damansara Perdana, Selangor",2026,593,,,,,Mutiara Damansara,41
+dvervain,D'Vervain,Damansara Perdana,"Bandar Damansara Perdana, Damansara Perdana, Selangor",2024,1066,,,,,Mutiara Damansara,41
+empire-residence,Empire Residence,Damansara Perdana,"Jalan PJU 8/1, Damansara Perdana, Selangor",2012,,,,,,Mutiara Damansara,26
+ritze-perdana-1,Ritze Perdana 1,Damansara Perdana,"Jalan PJU 8/2, Bandar Damansara Perdana, Damansara Perdana, Selangor",2006,997,0.26,1,,,Mutiara Damansara,26
+ritze-perdana-2,Ritze Perdana 2,Damansara Perdana,"Jalan PJU 8/1, Damansara Perdana, Selangor",2010,468,,,,,Mutiara Damansara,26
+kelana-damansara-suite,Kelana Damansara Suite,Kelana Jaya,"Jalan SS 7/26, Kelana Jaya, 47301 Petaling Jaya, Selangor",2016,,,,,,,
+the-trees,The Trees,Damansara Perdana,"Jalan PJU 8/1 Jalan Bukit Lanjan, Damansara Perdana, Selangor",2020,408,,,,,,
+the-arcuz,The Arcuz,Kelana Jaya,"Jalan PJU 1a/4f, Kelana Jaya, Petaling Jaya, Selangor",2023,685,0.38,,,,Lembah Subang,6
+arvore-residence,Arvore Residence,Kelana Jaya,"Jalan SS 4C/4, Kelana Jaya, Petaling Jaya, Selangor",2019,60,,,,,Kelana Jaya,2
+perdana-emerald,Perdana Emerald,Damansara Perdana,"Jalan PJU 8/3, Damansara Perdana, Selangor",2005,565,0.23,,,,Mutiara Damansara,19
+pinnacle-kelana-jaya,Pinnacle Kelana Jaya,Kelana Jaya,"Jalan SS 7/26, Kelana Jaya, Petaling Jaya, Selangor",2018,,,,,,,
+plaza-kelana-jaya,Plaza @ Kelana Jaya,Kelana Jaya,"Jalan SS 7/13b, Kelana Jaya, Petaling Jaya, Selangor",2021,696,0.38,,,,Glenmarie,16
+the-paxtonz,The Paxtonz,Damansara Perdana,"Jalan PJU 8/1, Damansara Perdana, Selangor",2026,844,,,,,,
+dcosmos-residences,D'Cosmos Residences,Damansara Perdana,"Bandar Damansara Perdana, Damansara Perdana, Selangor",2024,402,,,,,Mutiara Damansara,44
+dataran-prima,Dataran Prima,Kelana Jaya,"Jalan PJU1/41, Kelana Jaya, Petaling Jaya, Selangor",2005,375,,,,,Damansara Idaman,7
+kelana-mahkota,Kelana Mahkota,Kelana Jaya,"Jalan SS 7/19, Kelana Jaya, Petaling Jaya, Selangor",2005,712,0.25,,,,,
+perdana-exclusive,Perdana Exclusive,Damansara Perdana,"Jalan PJU 8/1, Bandar Damansara Perdana, Damansara Perdana, Selangor",2005,1013,,,,,,
+armanee-terrace,Armanee Terrace,Damansara Perdana,"8 Jalan PJU 8/1, Damansara Perdana, Selangor",2008,522,,,,,Mutiara Damansara,37
+flora-damansara-apartment,Flora Damansara Apartment,Damansara Perdana,"Jalan Pju 8/9, Damansara Perdana, Selangor",2015,,,,,,,
+kelana-dputera,Kelana D'Putera,Kelana Jaya,"Jalan SS 7/26, Kelana Jaya, Petaling Jaya, Selangor",1999,625,,,,,,
+perdana-view,Perdana View,Damansara Perdana,"Jalan PJU 8/1, Damansara Perdana, Selangor",2004,,0.18,,,,,

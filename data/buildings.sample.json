@@ -1,0 +1,392 @@
+{
+  "_comment": "Placeholder buildings. Every number here is invented — they exist so the site has something to render before real listings arrive. Off by default; set PUBLIC_INCLUDE_SAMPLE=true in .env to show them. When a building here gets real listings, `npm run derive` moves it into data/buildings.json and it stops being a placeholder.",
+  "buildings": [
+    {
+      "slug": "ara-greens-residences",
+      "name": "Ara Greens Residences",
+      "area": "Ara Damansara",
+      "address": "Jalan PJU 1A/3, Ara Damansara, 47301 Petaling Jaya, Selangor",
+      "completionYear": 2017,
+      "totalUnits": 460,
+      "sample": true,
+      "facts": {
+        "maintenancePsf": 0.33,
+        "parkingPerUnit": 2,
+        "liftCount": 4,
+        "fibreProviders": [
+          "unifi",
+          "time"
+        ],
+        "nearestStation": "Ara Damansara LRT",
+        "walkMinutesToStation": 9
+      },
+      "metrics": {
+        "medianRentMyr": 2400,
+        "medianSqft": 1050,
+        "medianPsf": 2.29,
+        "listingCount": 14,
+        "byBedroom": [
+          {
+            "beds": 2,
+            "medianRentMyr": 2150,
+            "count": 6
+          },
+          {
+            "beds": 3,
+            "medianRentMyr": 2600,
+            "count": 8
+          }
+        ]
+      },
+      "reviews": {
+        "count": 38,
+        "average": 4.1,
+        "themes": [
+          {
+            "label": "Management responsiveness",
+            "sentiment": "positive",
+            "mentions": 12
+          },
+          {
+            "label": "Lift waiting times",
+            "sentiment": "mixed",
+            "mentions": 9
+          },
+          {
+            "label": "Pool and gym upkeep",
+            "sentiment": "positive",
+            "mentions": 7
+          }
+        ]
+      },
+      "listings": [
+        {
+          "beds": 2,
+          "baths": 2,
+          "sqft": 1000,
+          "priceMyr": 2100,
+          "furnishing": "partial",
+          "source": "propertyguru",
+          "sourceUrl": "https://www.propertyguru.com.my/"
+        },
+        {
+          "beds": 3,
+          "baths": 2,
+          "sqft": 1130,
+          "priceMyr": 2600,
+          "furnishing": "furnished",
+          "source": "mudah",
+          "sourceUrl": "https://www.mudah.my/"
+        },
+        {
+          "beds": 3,
+          "baths": 3,
+          "sqft": 1250,
+          "priceMyr": 2900,
+          "furnishing": "furnished",
+          "source": "propertyguru",
+          "sourceUrl": "https://www.propertyguru.com.my/"
+        }
+      ]
+    },
+    {
+      "slug": "pacific-place",
+      "name": "Pacific Place",
+      "area": "Ara Damansara",
+      "address": "Jalan PJU 1A/4, Ara Damansara, 47301 Petaling Jaya, Selangor",
+      "completionYear": 2013,
+      "totalUnits": 1064,
+      "sample": true,
+      "facts": {
+        "maintenancePsf": 0.28,
+        "parkingPerUnit": 1,
+        "liftCount": 6,
+        "fibreProviders": [
+          "unifi",
+          "time",
+          "maxis"
+        ],
+        "nearestStation": "Ara Damansara LRT",
+        "walkMinutesToStation": 12
+      },
+      "metrics": {
+        "medianRentMyr": 1750,
+        "medianSqft": 800,
+        "medianPsf": 2.19,
+        "listingCount": 23,
+        "byBedroom": [
+          {
+            "beds": 1,
+            "medianRentMyr": 1400,
+            "count": 5
+          },
+          {
+            "beds": 2,
+            "medianRentMyr": 1750,
+            "count": 12
+          },
+          {
+            "beds": 3,
+            "medianRentMyr": 2200,
+            "count": 6
+          }
+        ]
+      },
+      "reviews": {
+        "count": 64,
+        "average": 3.6,
+        "themes": [
+          {
+            "label": "Retail on the ground floor",
+            "sentiment": "positive",
+            "mentions": 21
+          },
+          {
+            "label": "Parking allocation",
+            "sentiment": "negative",
+            "mentions": 15
+          },
+          {
+            "label": "Security patrols",
+            "sentiment": "mixed",
+            "mentions": 8
+          }
+        ]
+      },
+      "listings": [
+        {
+          "beds": 1,
+          "baths": 1,
+          "sqft": 650,
+          "priceMyr": 1400,
+          "furnishing": "furnished",
+          "source": "propertyguru",
+          "sourceUrl": "https://www.propertyguru.com.my/"
+        },
+        {
+          "beds": 2,
+          "baths": 2,
+          "sqft": 810,
+          "priceMyr": 1750,
+          "furnishing": "partial",
+          "source": "mudah",
+          "sourceUrl": "https://www.mudah.my/"
+        },
+        {
+          "beds": 2,
+          "baths": 2,
+          "sqft": 850,
+          "priceMyr": 1900,
+          "furnishing": "furnished",
+          "source": "iproperty",
+          "sourceUrl": "https://www.iproperty.com.my/"
+        },
+        {
+          "beds": 3,
+          "baths": 2,
+          "sqft": 1100,
+          "priceMyr": 2200,
+          "furnishing": "bare",
+          "source": "mudah",
+          "sourceUrl": "https://www.mudah.my/"
+        }
+      ]
+    },
+    {
+      "slug": "kelana-puteri",
+      "name": "Kelana Puteri",
+      "area": "Kelana Jaya",
+      "address": "Jalan SS 6/1, Kelana Jaya, 47301 Petaling Jaya, Selangor",
+      "completionYear": 2003,
+      "totalUnits": 636,
+      "sample": true,
+      "facts": {
+        "maintenancePsf": 0.21,
+        "parkingPerUnit": 1,
+        "liftCount": 4,
+        "fibreProviders": [
+          "unifi"
+        ],
+        "nearestStation": "Kelana Jaya LRT",
+        "walkMinutesToStation": 7
+      },
+      "metrics": {
+        "medianRentMyr": 1600,
+        "medianSqft": 950,
+        "medianPsf": 1.68,
+        "listingCount": 11,
+        "byBedroom": [
+          {
+            "beds": 2,
+            "medianRentMyr": 1450,
+            "count": 4
+          },
+          {
+            "beds": 3,
+            "medianRentMyr": 1700,
+            "count": 7
+          }
+        ]
+      },
+      "reviews": {
+        "count": 27,
+        "average": 3.4,
+        "themes": [
+          {
+            "label": "Walk to the LRT",
+            "sentiment": "positive",
+            "mentions": 14
+          },
+          {
+            "label": "Ageing common areas",
+            "sentiment": "negative",
+            "mentions": 11
+          }
+        ]
+      },
+      "listings": [
+        {
+          "beds": 2,
+          "baths": 2,
+          "sqft": 900,
+          "priceMyr": 1450,
+          "furnishing": "bare",
+          "source": "mudah",
+          "sourceUrl": "https://www.mudah.my/"
+        },
+        {
+          "beds": 3,
+          "baths": 2,
+          "sqft": 1000,
+          "priceMyr": 1700,
+          "furnishing": "partial",
+          "source": "propertyguru",
+          "sourceUrl": "https://www.propertyguru.com.my/"
+        }
+      ]
+    },
+    {
+      "slug": "the-boulevard-serviced-suites",
+      "name": "The Boulevard Serviced Suites",
+      "area": "Ara Damansara",
+      "address": "Jalan PJU 1A/7A, Ara Damansara, 47301 Petaling Jaya, Selangor",
+      "completionYear": 2020,
+      "totalUnits": 320,
+      "sample": true,
+      "facts": {
+        "maintenancePsf": 0.38,
+        "parkingPerUnit": 2,
+        "liftCount": 3,
+        "fibreProviders": [
+          "unifi",
+          "time"
+        ],
+        "nearestStation": "Ara Damansara LRT",
+        "walkMinutesToStation": 5
+      },
+      "metrics": {
+        "medianRentMyr": 2650,
+        "medianSqft": 1120,
+        "medianPsf": 2.37,
+        "listingCount": 4,
+        "byBedroom": [
+          {
+            "beds": 2,
+            "medianRentMyr": 2400,
+            "count": 2
+          },
+          {
+            "beds": 3,
+            "medianRentMyr": 2900,
+            "count": 2
+          }
+        ]
+      },
+      "reviews": {
+        "count": 3,
+        "average": 4.5,
+        "themes": []
+      },
+      "listings": [
+        {
+          "beds": 2,
+          "baths": 2,
+          "sqft": 1050,
+          "priceMyr": 2400,
+          "furnishing": "furnished",
+          "source": "propertyguru",
+          "sourceUrl": "https://www.propertyguru.com.my/"
+        },
+        {
+          "beds": 3,
+          "baths": 3,
+          "sqft": 1200,
+          "priceMyr": 2900,
+          "furnishing": "furnished",
+          "source": "iproperty",
+          "sourceUrl": "https://www.iproperty.com.my/"
+        }
+      ]
+    },
+    {
+      "slug": "casa-kelana",
+      "name": "Casa Kelana",
+      "area": "Kelana Jaya",
+      "address": "Jalan SS 6/12, Kelana Jaya, 47301 Petaling Jaya, Selangor",
+      "completionYear": 2008,
+      "totalUnits": 412,
+      "sample": true,
+      "facts": {
+        "maintenancePsf": 0.24,
+        "parkingPerUnit": 1,
+        "liftCount": 3,
+        "fibreProviders": [
+          "unifi",
+          "maxis"
+        ],
+        "nearestStation": "Kelana Jaya LRT",
+        "walkMinutesToStation": 18
+      },
+      "metrics": {
+        "medianRentMyr": 1500,
+        "medianSqft": 1000,
+        "medianPsf": 1.5,
+        "listingCount": 9,
+        "byBedroom": [
+          {
+            "beds": 3,
+            "medianRentMyr": 1500,
+            "count": 9
+          }
+        ]
+      },
+      "reviews": {
+        "count": 19,
+        "average": 3.2,
+        "themes": [
+          {
+            "label": "Quiet and low density",
+            "sentiment": "positive",
+            "mentions": 8
+          },
+          {
+            "label": "Distance to the LRT",
+            "sentiment": "negative",
+            "mentions": 10
+          }
+        ]
+      },
+      "listings": [
+        {
+          "beds": 3,
+          "baths": 2,
+          "sqft": 1000,
+          "priceMyr": 1500,
+          "furnishing": "partial",
+          "source": "mudah",
+          "sourceUrl": "https://www.mudah.my/"
+        }
+      ]
+    }
+  ]
+}

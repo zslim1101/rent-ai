@@ -6,6 +6,22 @@ dist/
 serviceAccount.json
 *-firebase-adminsdk-*.json
 
+# Collected listing data. Holds description text belonging to whoever wrote it,
+# so it stays on the machine that collected it: never committed, never seeded to
+# Firestore. Only the numbers derived from it get published.
+data/raw/
+
+# Saved search pages, the input to scripts/parse-page.mjs.
+#
+# These are the raw portal HTML and they carry far more than the parser takes:
+# an agent name and licence on every card, and — because agents type them into
+# their own ad copy — roughly twenty personal mobile numbers across the set we
+# have. Committing them would publish that, which is the thing docs/data-policy.md
+# says we never do. Keep them local, and delete them once derived.
+extracted-data/
+# Root-level only, so a real HTML asset under public/ or src/ still commits.
+/*.html
+
 # Local env
 .env
 .env.local

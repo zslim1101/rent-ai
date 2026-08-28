@@ -51,9 +51,7 @@ The second line starts the website. It will print a web address, usually
 To stop it, press `Ctrl+C` in the Terminal.
 
 **You do not need a Firebase account for this.** The site reads its information from a
-file in this folder, so it works straight away. The yellow bar at the top says the
-numbers are fake — because right now they are. They're placeholders so you can see what
-the site looks like.
+file in this folder, so it works straight away.
 
 ---
 
@@ -69,8 +67,32 @@ Open it in any text editor. It's a list of buildings, and each one has its rent 
 its maintenance fee, its facilities, and its available units. Change a number in there,
 save, and the website updates while you're looking at it.
 
-When you've put in real information, delete the line `"sample": true` from each building.
-That's what makes the yellow warning bar disappear.
+### The made-up buildings
+
+There's a second file:
+
+```
+data/buildings.sample.json
+```
+
+Every number in that one is invented. Those buildings exist so the site had something to
+show before there was real data, and **they are switched off.** The site shows only real
+buildings unless you ask for them.
+
+To see them, open `.env` and set:
+
+```
+PUBLIC_INCLUDE_SAMPLE=true
+```
+
+Then stop the site (`Ctrl+C`) and start it again with `npm run dev`. The made-up
+buildings appear with an amber **sample** tag next to the name, and a bar at the top
+explaining that some rows are placeholders. Set it back to `false` to hide them again.
+
+Two things worth knowing. They are never uploaded to Firebase — `npm run seed` sends
+`data/buildings.json` and nothing else, so invented rents cannot end up in your database.
+And when a made-up building gets real listings, `npm run derive` moves it into
+`data/buildings.json` for you and throws away the invented figures with it.
 
 ---
 
@@ -216,7 +238,8 @@ under five, we don't show a score at all.
 
 | File or folder | What it's for |
 |---|---|
-| `data/buildings.json` | All the building information. This is the one you'll edit. |
+| `data/buildings.json` | All the real building information. This is the one you'll edit. |
+| `data/buildings.sample.json` | The made-up buildings. Hidden unless `PUBLIC_INCLUDE_SAMPLE=true`. |
 | `src/pages/` | The three page designs: the building list, the all-listings page, and the individual building page. |
 | `src/lib/` | The code that loads and formats the information. |
 | `scripts/seed-firestore.mjs` | Copies your file into the online database. |
