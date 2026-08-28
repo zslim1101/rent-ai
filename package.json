@@ -5,18 +5,32 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "npm run check && astro build",
     "preview": "astro preview",
-    "seed": "node scripts/seed-firestore.mjs",
-    "deploy": "astro build && firebase deploy --only hosting"
+    "check": "node scripts/check-publishable.mjs",
+    "probe": "node scripts/collect.mjs --probe",
+    "collect": "node scripts/collect.mjs",
+    "parse": "node scripts/parse-page.mjs",
+    "derive": "node scripts/derive.mjs",
+    "facts": "node scripts/import-facts.mjs",
+    "gaps": "node scripts/build-gaps-page.mjs",
+    "gaps:check": "node scripts/build-gaps-page.mjs --check",
+    "analyse": "node scripts/analyse.mjs",
+    "seed": "npm run check && node scripts/seed-firestore.mjs",
+    "deploy": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.72.1",
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.2.1",
     "firebase": "^12.17.1",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "firebase-admin": "^14.2.0"
+    "@fontsource/instrument-sans": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "firebase-admin": "^14.2.0",
+    "playwright": "^1.62.1"
   }
 }

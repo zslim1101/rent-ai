@@ -2,7 +2,20 @@
 import Base from '../../layouts/Base.astro';
 import { getBuildings } from '../../lib/data';
 import type { Building } from '../../lib/types';
-import { myr, psf, sqft, furnishingLabel, isLowConfidence, LOW_CONFIDENCE_THRESHOLD } from '../../lib/format';
+import {
+  myr,
+  psf,
+  sqft,
+  bedLabel,
+  furnishingLabel,
+  valueLabel,
+  valueTone,
+  valueDetail,
+  isLowConfidence,
+  LOW_CONFIDENCE_THRESHOLD,
+  verdictLabel,
+  verdictTone,
+} from '../../lib/format';
 
 export async function getStaticPaths() {
   const buildings = await getBuildings();
@@ -14,27 +27,61 @@ interface Props {
 }
 
 const { building } = Astro.props;
-const { facts, metrics, reviews, listings } = building;
+const { facts, metrics, reviews, listings, analysis } = building;
+
+// Formatted for a person, not a log line.
+const generatedOn = analysis
+  ? new Date(analysis.provenance.generatedAt).toLocaleDateString('en-MY', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  : null;
 
 // A handful of reviews is an anecdote, not a rating. Show the themes, hold the score.
 const showReviewScore = reviews.count >= LOW_CONFIDENCE_THRESHOLD;
 
+/**
+ * Each gathered fact carries where it came from, when that was checked, and
+ * whether anyone corroborated it — see `FactSource` in types.ts. A number with
+ * one stale forum post behind it and the same number off a management notice
+ * are not the same claim, so the page says which it is rather than presenting
+ * both as settled.
+ *
+ * `Units per lift` is computed from two fields, so it is only as good as the
+ * weaker of them.
+ */
+const sourceFor = (...fields: string[]) => {
+  const found = fields.map((f) => building.factSources?.[f]).filter(Boolean);
+  if (found.length < fields.length) return undefined;
+  return found.some((s) => s!.confidence === 'unverified') ? { ...found[0]!, confidence: 'unverified' as const } : found[0];
+};
+
 const factRows = [
-  { label: 'Completed', value: building.completionYear ?? '—' },
-  { label: 'Total units', value: building.totalUnits?.toLocaleString('en-MY') ?? '—' },
-  { label: 'Maintenance fee', value: facts.maintenancePsf === null ? '—' : psf(facts.maintenancePsf) },
-  { label: 'Parking per unit', value: facts.parkingPerUnit ?? '—' },
-  { label: 'Lifts', value: facts.liftCount ?? '—' },
+  { label: 'Completed', value: building.completionYear ?? '—', source: sourceFor('completionYear') },
+  {
+    label: 'Total units',
+    value: building.totalUnits?.toLocaleString('en-MY') ?? '—',
+    source: sourceFor('totalUnits'),
+  },
+  {
+    label: 'Maintenance fee',
+    value: facts.maintenancePsf === null ? '—' : psf(facts.maintenancePsf),
+    source: sourceFor('maintenancePsf'),
+  },
+  { label: 'Parking per unit', value: facts.parkingPerUnit ?? '—', source: sourceFor('parkingPerUnit') },
+  { label: 'Lifts', value: facts.liftCount ?? '—', source: sourceFor('liftCount') },
   {
     label: 'Units per lift',
     value:
       building.totalUnits && facts.liftCount ? Math.round(building.totalUnits / facts.liftCount) : '—',
+    source: sourceFor('totalUnits', 'liftCount'),
   },
 ];
 ---
 
-<Base title={`${building.name} — rent & building facts`}>
-  <a href="/" class="text-sm text-emerald-700 hover:underline">&larr; All buildings</a>
+<Base title={`${building.name} — rent & building facts`} sample={building.sample ?? false}>
+  <a href="/" class="text-sm text-emerald-700 hover:underline">&larr; All developments</a>
 
   <header class="mt-4 mb-10">
     <h1 class="text-3xl font-semibold tracking-tight">{building.name}</h1>
@@ -59,29 +106,107 @@ const factRows = [
       {facts.nearestStation && <div class="mt-1 text-xs text-stone-500">{facts.nearestStation}</div>}
     </div>
     <div class="rounded-lg border border-stone-200 bg-white p-4">
-      <div class="text-xs uppercase tracking-wide text-stone-500">Active listings</div>
+      <div class="text-xs uppercase tracking-wide text-stone-500">Units available</div>
       <div class="mt-1 text-2xl font-semibold tabular-nums">{metrics.listingCount}</div>
+      {/*
+        The gap between units and adverts is worth showing: it is how much of
+        this development's apparent supply is the same figures listed twice.
+      */}
+      {metrics.advertCount && metrics.advertCount > metrics.listingCount && (
+        <div class="mt-1 text-xs text-stone-500">from {metrics.advertCount} adverts</div>
+      )}
     </div>
   </section>
 
   {
     isLowConfidence(metrics.listingCount) && (
       <p class="mb-10 rounded-lg border border-stone-200 bg-stone-100 px-4 py-3 text-sm text-stone-600">
-        Based on fewer than {LOW_CONFIDENCE_THRESHOLD} listings, so treat these medians as indicative
+        Based on fewer than {LOW_CONFIDENCE_THRESHOLD} units, so treat these medians as indicative
         rather than settled.
       </p>
     )
   }
 
-  <!-- Building facts -->
+  <!--
+    Our own assessment, kept visually distinct from everything above it. The
+    separation is the point: the numbers are facts, this is opinion, and a
+    reader should be able to tell which is which at a glance.
+  -->
+  {
+    analysis && (
+      <section class="mb-10 rounded-lg border border-stone-200 bg-white p-5">
+        <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 class="text-xl font-semibold tracking-tight">Our read</h2>
+          <p class="text-xs text-stone-500">
+            Written by us from the listing figures on {generatedOn}. Not from the portals.
+          </p>
+        </div>
+
+        <p class="max-w-2xl text-stone-700">{analysis.summary}</p>
+
+        <div class="mt-5 grid gap-6 sm:grid-cols-2">
+          {analysis.strengths.length > 0 && (
+            <div>
+              <h3 class="text-xs uppercase tracking-wide text-stone-500">Working in its favour</h3>
+              <ul class="mt-2 space-y-1.5 text-sm">
+                {analysis.strengths.map((point) => (
+                  <li class="flex gap-2">
+                    <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {analysis.caveats.length > 0 && (
+            <div>
+              <h3 class="text-xs uppercase tracking-wide text-stone-500">Worth checking</h3>
+              <ul class="mt-2 space-y-1.5 text-sm">
+                {analysis.caveats.map((point) => (
+                  <li class="flex gap-2">
+                    <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  <!-- Development facts -->
   <section class="mb-10">
-    <h2 class="mb-4 text-xl font-semibold tracking-tight">Building</h2>
+    <h2 class="mb-4 text-xl font-semibold tracking-tight">The development</h2>
     <dl class="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border border-stone-200 bg-white p-5 sm:grid-cols-3">
       {
         factRows.map((row) => (
           <div>
             <dt class="text-xs uppercase tracking-wide text-stone-500">{row.label}</dt>
-            <dd class="mt-1 tabular-nums">{row.value}</dd>
+            <dd class="mt-1 tabular-nums">
+              {row.value}
+              {row.source?.confidence === 'unverified' && (
+                <span
+                  class="ml-2 rounded bg-stone-100 px-1.5 py-0.5 align-middle text-xs tabular-nums text-stone-500"
+                  title={`One source, not corroborated: ${row.source.sources.join(', ')} — checked ${row.source.checkedAt}`}
+                >
+                  unverified
+                </span>
+              )}
+            </dd>
+            {/*
+              Only shown once a fact has been gathered. An empty field says
+              nothing about its sourcing, which is the honest reading — and is
+              also true of the completion years derive.mjs filled in from
+              agreeing listings without anyone looking anything up.
+            */}
+            {row.source?.confidence === 'verified' && (
+              <div class="mt-0.5 text-xs text-stone-400" title={row.source.sources.join(', ')}>
+                checked {row.source.checkedAt}
+              </div>
+            )}
           </div>
         ))
       }
@@ -120,7 +245,7 @@ const factRows = [
           {
             metrics.byBedroom.map((row) => (
               <tr>
-                <td class="px-4 py-3">{row.beds} bed</td>
+                <td class="px-4 py-3">{bedLabel(row.beds)}</td>
                 <td class="px-4 py-3 tabular-nums">{myr(row.medianRentMyr)}</td>
                 <td class="px-4 py-3 tabular-nums">
                   {row.count}
@@ -192,37 +317,89 @@ const factRows = [
             <th class="px-4 py-3 font-medium">Size</th>
             <th class="px-4 py-3 font-medium">Furnishing</th>
             <th class="px-4 py-3 font-medium">Rent</th>
-            <th class="px-4 py-3 font-medium">Source</th>
+            <th class="px-4 py-3 font-medium">Enquire</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-100">
           {
             listings.map((l) => (
-              <tr class="hover:bg-stone-50">
-                <td class="px-4 py-3">
-                  {l.beds} bed &middot; {l.baths} bath
-                </td>
-                <td class="px-4 py-3 tabular-nums">{sqft(l.sqft)}</td>
-                <td class="px-4 py-3">{furnishingLabel[l.furnishing] ?? l.furnishing}</td>
-                <td class="px-4 py-3 tabular-nums">{myr(l.priceMyr)}</td>
-                <td class="px-4 py-3">
-                  <a
-                    href={l.sourceUrl}
-                    rel="noopener nofollow"
-                    target="_blank"
-                    class="capitalize text-emerald-700 hover:underline"
-                  >
-                    {l.source}
-                  </a>
-                </td>
-              </tr>
+              <>
+                <tr class:list={['hover:bg-stone-50', { 'border-b-0': l.analysis }]}>
+                  <td class="px-4 py-3">
+                    {bedLabel(l.beds)} &middot; {l.baths} bath
+                    {l.value && (
+                      <span
+                        class:list={[
+                          'ml-2 inline-block rounded px-1.5 py-0.5 text-xs ring-1 ring-inset',
+                          valueTone[l.value.band],
+                        ]}
+                        title={valueDetail(l.value)}
+                      >
+                        {valueLabel[l.value.band]}
+                      </span>
+                    )}
+                    {/*
+                      Not "duplicate" — we cannot tell one flat advertised five
+                      times from five identical flats, and this wording is true
+                      either way.
+                    */}
+                    {l.copies && l.copies > 1 && (
+                      <div class="mt-0.5 text-xs text-stone-500">
+                        {l.copies} adverts with these exact figures
+                      </div>
+                    )}
+                  </td>
+                  <td class="px-4 py-3 tabular-nums">{sqft(l.sqft)}</td>
+                  <td class="px-4 py-3">{furnishingLabel[l.furnishing] ?? l.furnishing}</td>
+                  <td class="px-4 py-3 tabular-nums">{myr(l.priceMyr)}</td>
+                  {/*
+                    The whole contact path, deliberately. The advertiser's phone
+                    number and name live on their listing page, where they chose
+                    to publish them — so we send the reader there rather than
+                    keeping a copy. See docs/data-policy.md.
+                  */}
+                  <td class="px-4 py-3">
+                    <a
+                      href={l.sourceUrl}
+                      rel="noopener nofollow"
+                      target="_blank"
+                      class="inline-flex items-center gap-1 whitespace-nowrap rounded border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-800 hover:bg-emerald-100"
+                    >
+                      Contact on <span class="capitalize">{l.source}</span>
+                      <span aria-hidden="true">&rarr;</span>
+                    </a>
+                  </td>
+                </tr>
+
+                {l.analysis && (
+                  <tr class="bg-stone-50/60">
+                    <td colspan="5" class="px-4 pb-3 text-stone-600">
+                      <span
+                        class:list={[
+                          'mr-2 inline-block rounded px-2 py-0.5 text-xs ring-1 ring-inset',
+                          verdictTone[l.analysis.verdict] ?? verdictTone.unclear,
+                        ]}
+                      >
+                        {verdictLabel[l.analysis.verdict] ?? l.analysis.verdict}
+                      </span>
+                      {l.analysis.summary}
+                      {l.analysis.signals.length > 0 && (
+                        <span class="mt-1.5 block text-xs text-stone-500">
+                          {l.analysis.signals.join(' · ')}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </>
             ))
           }
         </tbody>
       </table>
     </div>
     <p class="mt-3 text-sm text-stone-500">
-      We show measurements and asking price only, and link out for the rest.
+      We show measurements and asking price only, and link out for the rest. The shaded lines are
+      our own assessment, written from those figures.
     </p>
   </section>
 </Base>

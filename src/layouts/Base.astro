@@ -1,13 +1,25 @@
 ---
 import '../styles/global.css';
-import { hasSampleData } from '../lib/data';
+import { hasSampleData, hasMixedData } from '../lib/data';
 
 interface Props {
   title: string;
+  /**
+   * Whether the figures on *this* page are placeholders. A page about one
+   * building knows the answer exactly and should say so; leaving it out falls
+   * back to "is anything in the dataset still placeholder", which is the right
+   * answer for pages that show everything.
+   */
+  sample?: boolean;
 }
 
-const { title } = Astro.props;
-const sample = await hasSampleData();
+const { title, sample = await hasSampleData() } = Astro.props;
+
+/**
+ * Only meaningful on pages that show everything. A building page passes
+ * `sample` explicitly and is one thing or the other, never a mixture.
+ */
+const mixed = sample && Astro.props.sample === undefined && (await hasMixedData());
 ---
 
 <!doctype html>
@@ -16,37 +28,53 @@ const sample = await hasSampleData();
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/instrument-sans-latin-700-normal.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/instrument-serif-latin-400-italic.woff2" crossorigin />
   </head>
-  <body class="min-h-screen bg-stone-50 text-stone-900 antialiased">
+  <body class="min-h-screen bg-sand font-sans text-ink antialiased">
     {
       sample && (
-        <div class="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900">
-          <strong class="font-semibold">Sample data.</strong> These figures are placeholders, not real
-          rents. Replace <code class="font-mono">data/buildings.json</code> to remove this notice.
+        <div class="bg-flag-tint px-4 py-2 text-center text-sm text-flag">
+          {mixed ? (
+            <>
+              <strong class="font-semibold">Some rows are sample data.</strong> Anything marked{' '}
+              <span class="rounded bg-flag/15 px-1.5 py-0.5 text-xs font-medium">sample</span> is a
+              placeholder, not a real rent. The rest came from collected listings.
+            </>
+          ) : (
+            <>
+              <strong class="font-semibold">Sample data.</strong> These figures are placeholders, not
+              real rents. Replace <code class="font-mono">data/buildings.json</code> to remove this
+              notice.
+            </>
+          )}
         </div>
       )
     }
 
-    <header class="border-b border-stone-200 bg-white">
-      <div class="mx-auto flex max-w-5xl flex-wrap items-baseline gap-x-6 gap-y-2 px-4 py-5">
-        <a href="/" class="text-lg font-semibold tracking-tight">Rent<span class="text-emerald-600">AI</span></a>
-        <nav class="flex gap-4 text-sm">
-          <a href="/" class="text-stone-600 hover:text-stone-900">Buildings</a>
-          <a href="/listings" class="text-stone-600 hover:text-stone-900">Listings</a>
+    <header class="border-b border-line bg-paper">
+      <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-2 px-5 py-4">
+        <a href="/" class="text-[1.35rem] font-bold tracking-[-0.03em] text-ink">
+          Rent<span class="font-serif italic font-normal text-brand">ai</span>
+        </a>
+        <nav class="flex gap-6 text-sm font-medium">
+          <a href="/" class="text-ink-2 transition-colors hover:text-brand">Developments</a>
+          <a href="/listings" class="text-ink-2 transition-colors hover:text-brand">Listings</a>
         </nav>
-        <p class="ml-auto text-sm text-stone-500">Ara Damansara &amp; Kelana Jaya</p>
       </div>
     </header>
 
-    <main class="mx-auto max-w-5xl px-4 py-10">
+    <main class="mx-auto max-w-6xl px-5 py-12">
       <slot />
     </main>
 
-    <footer class="mt-16 border-t border-stone-200 bg-white">
-      <div class="mx-auto max-w-5xl px-4 py-6 text-sm text-stone-500">
-        <p>
-          Rent figures are medians computed from listing counts shown on each building. We link out to
-          the source listings rather than reproduce them.
+    <footer class="mt-20 border-t border-line bg-paper">
+      <div class="mx-auto flex max-w-6xl flex-col gap-2 px-5 py-8 text-sm text-mute">
+        <p class="label">On the numbers</p>
+        <p class="max-w-2xl">
+          Rents are medians computed from the listings counted on each development. Building facts
+          carry the source they came from and whether anything corroborated them. We link out to the
+          source listings rather than reproduce them.
         </p>
       </div>
     </footer>

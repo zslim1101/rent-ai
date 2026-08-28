@@ -1,9 +1,94 @@
 @import 'tailwindcss';
 
+/*
+ * Self-hosted, not linked from a CDN. The site is static on Firebase Hosting and
+ * a webfont request to a third party is both a dependency we don't control and a
+ * request we'd be making on every reader's behalf.
+ *
+ * `swap` because a flash of the fallback beats a flash of nothing, and the
+ * fallbacks below are metric-near enough that the reflow is small.
+ */
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/fonts/instrument-sans-latin-400-normal.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/fonts/instrument-sans-latin-500-normal.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/fonts/instrument-sans-latin-600-normal.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/fonts/instrument-sans-latin-700-normal.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+/* Used only for emphasis inside headlines. One weight, one style, on purpose. */
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/instrument-serif-latin-400-italic.woff2') format('woff2');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+
+/*
+ * The palette. Warm neutrals rather than Tailwind's stone, and a green deepened
+ * well past the default emerald so the accent reads as a decision. `line` and
+ * `mute` carry a trace of the accent's hue so the greys sit with it.
+ */
+@theme {
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-paper: #ffffff;
+  --color-sand: #faf9f6;
+  --color-ink: #14120f;
+  --color-ink-2: #4b453d;
+  --color-mute: #8b8378;
+  --color-line: #e7e3db;
+  --color-line-2: #f1eee8;
+
+  --color-brand: #16764a;
+  --color-brand-deep: #0f5836;
+  --color-tint: #e9f2ec;
+
+  --color-flag: #a1620a;
+  --color-flag-tint: #fbf2e2;
+}
+
 :root {
   color-scheme: light;
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+/* Data columns only line up if the digits do. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The mono micro-label used throughout: eyebrows, table heads, card meta. */
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-mute);
 }

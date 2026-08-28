@@ -1,7 +1,19 @@
 ---
 import Base from '../layouts/Base.astro';
 import { getAllListings } from '../lib/data';
-import { myr, psf, sqft, furnishingLabel } from '../lib/format';
+import {
+  myr,
+  psf,
+  sqft,
+  bedLabel,
+  furnishingLabel,
+  verdictLabel,
+  verdictTone,
+  valueLabel,
+  valueTone,
+  valueDetail,
+  areaList,
+} from '../lib/format';
 
 const listings = await getAllListings();
 
@@ -9,11 +21,11 @@ const areas = [...new Set(listings.map((l) => l.area))].sort();
 const bedCounts = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b);
 ---
 
-<Base title="All listings — Ara Damansara & Kelana Jaya">
+<Base title={`All listings — ${areaList(areas)}`}>
   <section class="mb-8">
     <h1 class="text-3xl font-semibold tracking-tight">All listings</h1>
     <p class="mt-2 max-w-2xl text-stone-600">
-      Every unit we know of across the cluster. Sort by rent per square foot to compare a small
+      Every unit we know of in {areaList(areas)}. Sort by rent per square foot to compare a small
       furnished unit against a big bare one honestly.
     </p>
   </section>
@@ -32,7 +44,7 @@ const bedCounts = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b
       <span class="text-xs uppercase tracking-wide text-stone-500">Bedrooms</span>
       <select id="f-beds" class="rounded border border-stone-300 px-2 py-1.5 text-sm">
         <option value="">Any</option>
-        {bedCounts.map((b) => <option value={b}>{b} bed</option>)}
+        {bedCounts.map((b) => <option value={b}>{bedLabel(b)}</option>)}
       </select>
     </label>
 
@@ -43,6 +55,7 @@ const bedCounts = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b
         <option value="furnished">Fully furnished</option>
         <option value="partial">Partly furnished</option>
         <option value="bare">Unfurnished</option>
+        <option value="unknown">Not stated</option>
       </select>
     </label>
 
@@ -60,6 +73,7 @@ const bedCounts = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b
     <label class="flex flex-col gap-1">
       <span class="text-xs uppercase tracking-wide text-stone-500">Sort by</span>
       <select id="f-sort" class="rounded border border-stone-300 px-2 py-1.5 text-sm">
+        <option value="value-desc">Best value in its development</option>
         <option value="price-asc">Rent, lowest first</option>
         <option value="price-desc">Rent, highest first</option>
         <option value="psf-asc">Per sqft, lowest first</option>
@@ -77,20 +91,21 @@ const bedCounts = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b
     </button>
   </div>
 
-  <p id="count" class="mb-3 text-sm text-stone-500">{listings.length} listings</p>
+  <p id="count" class="mb-3 text-sm text-stone-500">{listings.length} units</p>
 
   <div class="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-    <table class="w-full min-w-[52rem] text-left text-sm">
+    <table class="w-full min-w-[62rem] text-left text-sm">
       <thead class="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
         <tr>
-          <th class="px-4 py-3 font-medium">Building</th>
+          <th class="px-4 py-3 font-medium">Development</th>
           <th class="px-4 py-3 font-medium">Layout</th>
           <th class="px-4 py-3 font-medium">Size</th>
           <th class="px-4 py-3 font-medium">Furnishing</th>
           <th class="px-4 py-3 font-medium">Rent</th>
           <th class="px-4 py-3 font-medium">Per sqft</th>
           <th class="px-4 py-3 font-medium">LRT</th>
-          <th class="px-4 py-3 font-medium">Source</th>
+          <th class="px-4 py-3 font-medium">Our read</th>
+          <th class="px-4 py-3 font-medium">Enquire</th>
         </tr>
       </thead>
       <tbody id="rows" class="divide-y divide-stone-100">
@@ -105,15 +120,29 @@ const bedCounts = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b
               data-sqft={l.sqft}
               data-psf={l.pricePsf.toFixed(4)}
               data-walk={l.walkMinutesToStation ?? 999}
+              {/*
+                -1 for a unit with no score, so "best value first" sinks the
+                unscored rather than floating them on a zero they never earned.
+                A `check` row scores -1 too: it is a question, not a bargain.
+              */}
+              data-value={l.value && l.value.band !== 'check' ? l.value.cheaperThan : -1}
             >
               <td class="px-4 py-3">
                 <a href={`/building/${l.buildingSlug}`} class="font-medium text-emerald-700 hover:underline">
                   {l.buildingName}
                 </a>
+                {l.sample && (
+                  <span
+                    class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900"
+                    title="Placeholder unit — invented figures, not a real advert"
+                  >
+                    sample
+                  </span>
+                )}
                 <div class="text-xs text-stone-500">{l.area}</div>
               </td>
               <td class="px-4 py-3 whitespace-nowrap">
-                {l.beds} bed &middot; {l.baths} bath
+                {bedLabel(l.beds)} &middot; {l.baths} bath
               </td>
               <td class="px-4 py-3 tabular-nums whitespace-nowrap">{sqft(l.sqft)}</td>
               <td class="px-4 py-3 whitespace-nowrap">{furnishingLabel[l.furnishing] ?? l.furnishing}</td>
@@ -126,14 +155,55 @@ const bedCounts = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b
                   `${l.walkMinutesToStation} min`
                 )}
               </td>
+              {/*
+                A chip only. The full assessment lives on the development page,
+                because a verdict is a comparison against the other units in
+                that block and reads as a claim about the whole corridor if you
+                lift it out of context. One row per listing also keeps the
+                filter and sort script below working on `tbody tr` unchanged.
+
+                The written verdict wins when there is one, because it was made
+                with these same numbers plus judgement. Otherwise the arithmetic
+                score stands on its own — and today that is every row, since
+                nothing has been through analyse.mjs yet.
+              */}
+              <td class="px-4 py-3 whitespace-nowrap">
+                {l.analysis ? (
+                  <a
+                    href={`/building/${l.buildingSlug}`}
+                    class:list={[
+                      'inline-block rounded px-2 py-0.5 text-xs ring-1 ring-inset hover:underline',
+                      verdictTone[l.analysis.verdict] ?? verdictTone.unclear,
+                    ]}
+                  >
+                    {verdictLabel[l.analysis.verdict] ?? l.analysis.verdict}
+                  </a>
+                ) : l.value ? (
+                  <span
+                    class:list={[
+                      'inline-block rounded px-2 py-0.5 text-xs ring-1 ring-inset',
+                      valueTone[l.value.band],
+                    ]}
+                    title={valueDetail(l.value)}
+                  >
+                    {valueLabel[l.value.band]}
+                  </span>
+                ) : (
+                  <span class="text-stone-400" title="Too few comparable units here to say">
+                    —
+                  </span>
+                )}
+              </td>
+              {/* The contact path. See the note in building/[slug].astro. */}
               <td class="px-4 py-3">
                 <a
                   href={l.sourceUrl}
                   rel="noopener nofollow"
                   target="_blank"
-                  class="capitalize text-emerald-700 hover:underline"
+                  class="inline-flex items-center gap-1 whitespace-nowrap rounded border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-800 hover:bg-emerald-100"
                 >
-                  {l.source}
+                  Contact on <span class="capitalize">{l.source}</span>
+                  <span aria-hidden="true">&rarr;</span>
                 </a>
               </td>
             </tr>
@@ -167,6 +237,9 @@ const bedCounts = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b
   const num = (row: HTMLElement, key: string) => Number(row.dataset[key]);
 
   const sorters: Record<string, (a: HTMLElement, b: HTMLElement) => number> = {
+    // Ties on the percentile are broken by the cheaper rent, so the top of the
+    // list is not an arbitrary pick among units that all beat 100% of their peers.
+    'value-desc': (a, b) => num(b, 'value') - num(a, 'value') || num(a, 'price') - num(b, 'price'),
     'price-asc': (a, b) => num(a, 'price') - num(b, 'price'),
     'price-desc': (a, b) => num(b, 'price') - num(a, 'price'),
     'psf-asc': (a, b) => num(a, 'psf') - num(b, 'psf'),
@@ -193,7 +266,7 @@ const bedCounts = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b
       tbody.appendChild(row);
     }
 
-    count.textContent = `${visible} listing${visible === 1 ? '' : 's'}`;
+    count.textContent = `${visible} unit${visible === 1 ? '' : 's'}`;
     empty.classList.toggle('hidden', visible > 0);
   }
 

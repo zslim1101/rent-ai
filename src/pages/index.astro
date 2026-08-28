@@ -1,74 +1,909 @@
 ---
 import Base from '../layouts/Base.astro';
-import { getBuildings } from '../lib/data';
-import { myr, psf, isLowConfidence } from '../lib/format';
+import { getBuildings, getAllListings } from '../lib/data';
+import {
+  myr,
+  psf,
+  sqft as sqftLabel,
+  bedLabel,
+  isLowConfidence,
+  areaList,
+  LOW_CONFIDENCE_THRESHOLD,
+} from '../lib/format';
 
 const buildings = await getBuildings();
+const listings = await getAllListings();
 const totalListings = buildings.reduce((sum, b) => sum + b.metrics.listingCount, 0);
+const areas = areaList(buildings.map((b) => b.area));
+
+const areaOptions = [...new Set(listings.map((l) => l.area))].sort().map((name) => ({
+  name,
+  count: listings.filter((l) => l.area === name).length,
+}));
+const bedOptions = [...new Set(listings.map((l) => l.beds))].sort((a, b) => a - b);
+
+const median = (xs: number[]): number => {
+  const s = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+};
+
+/** Linear-interpolated quantile. Used for the estimate's range, not for ranking. */
+const quantile = (xs: number[], q: number): number => {
+  const s = [...xs].sort((a, b) => a - b);
+  const i = (s.length - 1) * q;
+  const lo = Math.floor(i);
+  const hi = Math.ceil(i);
+  return lo === hi ? s[lo] : s[lo] + (s[hi] - s[lo]) * (i - lo);
+};
+
+/**
+ * An estimated rent for one unit, from the units it would actually be weighed
+ * against: same development, same bedroom count.
+ *
+ * Expressed in ringgit rather than as a percentile because a percentile is a
+ * fact about a ranking and a tenant needs a number they can negotiate against.
+ * It is the *same* comparison `ValueScore` already makes — median rent per sqft
+ * across the cohort, multiplied back up by this unit's floor area, so an unusually
+ * large or small unit isn't judged against the cohort's typical size.
+ *
+ * The range is the cohort's interquartile psf, not its full spread: one mis-keyed
+ * floor area at either end would otherwise widen it to uselessness.
+ *
+ * Null below five comparable units, matching LOW_CONFIDENCE_THRESHOLD everywhere
+ * else. A "market rate" drawn from three adverts is not a market rate.
+ *
+ * Peers are also held to within SIZE_BAND of this unit's floor area, which is not
+ * fussiness. Rent per sqft runs inversely to size, so a bedroom count alone puts
+ * Empire City's 342 sqft "1 bed" in the same cohort as its 1,180 sqft one — a
+ * 3.45x spread — and the psf median would then call every small unit overpriced
+ * and every large one a bargain. Banding costs five points of coverage (76% to
+ * 71% of listings) and buys a comparison that means something.
+ */
+const SIZE_BAND = 0.25;
+
+const peersOf = (l: (typeof listings)[number]) =>
+  listings.filter(
+    (p) =>
+      p.buildingSlug === l.buildingSlug &&
+      p.beds === l.beds &&
+      p.sqft > 0 &&
+      Math.abs(p.sqft - l.sqft) / l.sqft <= SIZE_BAND,
+  );
+
+const rows = listings.map((l) => {
+  const peers = l.sqft > 0 ? peersOf(l) : [];
+  const peerPsf = peers.map((p) => p.pricePsf).filter((x) => x > 0);
+  const enough = peers.length >= LOW_CONFIDENCE_THRESHOLD && l.sqft > 0 && peerPsf.length > 0;
+
+  const estimate = enough
+    ? {
+        rent: Math.round(median(peerPsf) * l.sqft),
+        low: Math.round(quantile(peerPsf, 0.25) * l.sqft),
+        high: Math.round(quantile(peerPsf, 0.75) * l.sqft),
+        cohort: peers.length,
+      }
+    : null;
+
+  return {
+    l,
+    estimate,
+    /** Negative means the asking rent is below the estimate. */
+    delta: estimate && estimate.rent > 0 ? (l.priceMyr - estimate.rent) / estimate.rent : null,
+  };
+});
+
+/**
+ * How a match score is built, and what it deliberately leaves out.
+ *
+ * The requested weighting was Location 25, Price/sqft 15, Facilities 10,
+ * Surrounding amenities 10 — which sums to 60, and three of those four rest on
+ * data this project does not hold: there are no coordinates (no map, by
+ * decision), `nearestStation` is filled for 1 development of 29,
+ * `walkMinutesToStation` for none, and there is no facilities or points-of-
+ * interest field at all.
+ *
+ * So the score is built from what can actually be computed, normalised to 100,
+ * and the unscored factors are printed on the page next to it. A weight applied
+ * to a field that is null for every row is not a weighting, it is decoration.
+ */
+const WEIGHTS = [
+  { key: 'below', weight: 40, label: 'Price against comparable units here' },
+  { key: 'psf', weight: 15, label: 'Rent per sqft' },
+  { key: 'budget', weight: 15, label: 'Room inside your budget' },
+  { key: 'size', weight: 10, label: 'Floor area' },
+  { key: 'age', weight: 10, label: 'Building age' },
+  { key: 'density', weight: 10, label: 'Development density' },
+];
+
+/** Named so the page can say what the score does not know. */
+const UNSCORED = [
+  ['Location', 25],
+  ['Facilities', 10],
+  ['Surrounding amenities', 10],
+];
+
+/**
+ * Which of the customer's stated criteria we can actually act on.
+ *
+ * Kept as data next to the form rather than as prose in it, because the honest
+ * version of this list changes every time someone fills a field in — and a form
+ * that quietly stops being true is worse than one that admits its limits.
+ */
+const NOT_YET_MATCHED = [
+  'walk to LRT/MRT',
+  'parking',
+  'gym, pool, lift, visitor parking',
+  'move-in date and lease length',
+  'floor, view, pets',
+  'commute to a workplace',
+];
 ---
 
-<Base title="Rental directory — Ara Damansara & Kelana Jaya">
-  <section class="mb-10">
-    <h1 class="text-3xl font-semibold tracking-tight">Buildings in the cluster</h1>
-    <p class="mt-2 max-w-2xl text-stone-600">
-      {buildings.length} buildings, {totalListings} listings. Median rents, maintenance fees and walk
-      times to the LRT — the things listing portals do not tell you.
-    </p>
-  </section>
+<Base title={`Rental developments in Petaling Jaya — ${areas}`}>
+  <!-- Hero. The thesis of the site, which is that a development is not an advert. -->
+  <section class="mb-14 grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+    <div class="flex flex-col gap-6">
+      <span class="inline-flex w-fit items-center gap-2 rounded-full border border-line bg-paper px-3 py-1.5">
+        <span class="size-1.5 rounded-full bg-brand"></span>
+        <span class="label !text-ink-2">
+          {buildings.length} developments &middot; {totalListings} units &middot; Petaling Jaya
+        </span>
+      </span>
 
-  <div class="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-    <table class="w-full min-w-[46rem] text-left text-sm">
-      <thead class="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
-        <tr>
-          <th class="px-4 py-3 font-medium">Building</th>
-          <th class="px-4 py-3 font-medium">Median rent</th>
-          <th class="px-4 py-3 font-medium">Per sqft</th>
-          <th class="px-4 py-3 font-medium">Maintenance</th>
-          <th class="px-4 py-3 font-medium">Walk to LRT</th>
-          <th class="px-4 py-3 font-medium">Listings</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-stone-100">
+      <h1 class="max-w-[16ch] text-[clamp(2.5rem,7vw,4.25rem)] leading-[0.98] font-bold tracking-[-0.04em] text-balance">
+        Stop comparing adverts.
+        <span class="block font-serif font-normal tracking-[-0.01em] text-brand italic">
+          Start comparing buildings.
+        </span>
+      </h1>
+
+      <p class="max-w-[58ch] text-lg leading-relaxed text-ink-2">
+        Portals rank by whoever paid. We rank by what a unit costs against the units you would
+        actually weigh it against &mdash; same block, same bedrooms, same size. Every score shows its
+        working, and every card says what we still don't know.
+      </p>
+    </div>
+
+    <!-- The honest counterweight to a scoring page: what the score cannot see. -->
+    <aside class="rounded border border-line bg-paper p-5">
+      <p class="label mb-3">Not in any score</p>
+      <ul class="flex flex-col gap-2 text-sm text-ink-2">
         {
-          buildings.map((b) => (
-            <tr class="hover:bg-stone-50">
-              <td class="px-4 py-3">
-                <a href={`/building/${b.slug}`} class="font-medium text-emerald-700 hover:underline">
-                  {b.name}
-                </a>
-                <div class="text-xs text-stone-500">{b.area}</div>
-              </td>
-              <td class="px-4 py-3 tabular-nums">{myr(b.metrics.medianRentMyr)}</td>
-              <td class="px-4 py-3 tabular-nums">{psf(b.metrics.medianPsf)}</td>
-              <td class="px-4 py-3 tabular-nums">
-                {b.facts.maintenancePsf === null ? (
-                  <span class="text-stone-400">—</span>
-                ) : (
-                  psf(b.facts.maintenancePsf)
-                )}
-              </td>
-              <td class="px-4 py-3 tabular-nums">
-                {b.facts.walkMinutesToStation === null ? (
-                  <span class="text-stone-400">—</span>
-                ) : (
-                  `${b.facts.walkMinutesToStation} min`
-                )}
-              </td>
-              <td class="px-4 py-3 tabular-nums">
-                {b.metrics.listingCount}
-                {isLowConfidence(b.metrics.listingCount) && (
-                  <span
-                    class="ml-2 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500"
-                    title="Fewer than 5 listings — treat the median as indicative only"
-                  >
-                    low
-                  </span>
-                )}
-              </td>
-            </tr>
+          NOT_YET_MATCHED.map((f) => (
+            <li class="flex items-baseline gap-2.5">
+              <span class="mt-1.5 size-1 shrink-0 rounded-full bg-mute" />
+              {f}
+            </li>
           ))
         }
-      </tbody>
-    </table>
-  </div>
+      </ul>
+      <p class="mt-4 border-t border-line-2 pt-3 text-xs leading-relaxed text-mute">
+        We ask about these below so we know what to go and find out. None of them move the ranking
+        today.
+      </p>
+    </aside>
+  </section>
+
+  <!-- Requirements. -->
+  <form id="finder" class="mb-10 rounded border border-line bg-paper">
+    <div class="flex flex-wrap items-baseline gap-3 border-b border-line-2 px-5 py-3.5">
+      <span class="label">Step 01 &middot; what you're after</span>
+      <span class="ml-auto text-xs text-mute">Nothing here is sent anywhere</span>
+    </div>
+
+    <div class="grid gap-6 px-5 py-5 sm:grid-cols-2 lg:grid-cols-4">
+      <label class="flex flex-col gap-2">
+        <span class="label">Budget</span>
+        <span class="flex items-baseline gap-1.5 border-b border-line pb-1.5 focus-within:border-brand">
+          <span class="font-mono text-sm text-mute">RM</span>
+          <input
+            id="f-max"
+            type="number"
+            step="100"
+            min="0"
+            placeholder="no limit"
+            class="tnum w-full bg-transparent text-lg font-semibold outline-none placeholder:font-normal placeholder:text-mute/60"
+          />
+          <span class="text-xs text-mute">/mo</span>
+        </span>
+      </label>
+
+      <label class="flex flex-col gap-2">
+        <span class="label">Order by</span>
+        <select
+          id="f-sort"
+          class="border-b border-line bg-transparent pb-1.5 text-sm font-medium outline-none focus:border-brand"
+        >
+          <option value="match">Best match</option>
+          <option value="value-desc">Best value for its block</option>
+          <option value="price-asc">Rent, lowest first</option>
+          <option value="psf-asc">Most space per ringgit</option>
+          <option value="year-desc">Newest building</option>
+          <option value="units-asc">Lowest density</option>
+        </select>
+      </label>
+
+      <fieldset class="flex flex-col gap-2 sm:col-span-2">
+        <legend class="label mb-2">Bedrooms</legend>
+        <div class="flex flex-wrap gap-1.5">
+          {
+            bedOptions.map((b) => (
+              <label class="cursor-pointer">
+                <input type="checkbox" name="beds" value={b} class="peer sr-only" />
+                <span class="inline-block rounded-full border border-line px-3 py-1 text-sm text-ink-2 transition-colors peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 hover:border-mute">
+                  {bedLabel(b)}
+                </span>
+              </label>
+            ))
+          }
+        </div>
+      </fieldset>
+
+      <fieldset class="flex flex-col gap-2 sm:col-span-2 lg:col-span-4">
+        <legend class="label mb-2">Area</legend>
+        <div class="flex flex-wrap gap-1.5">
+          {
+            areaOptions.map((a) => (
+              <label class="cursor-pointer">
+                <input type="checkbox" name="area" value={a.name} class="peer sr-only" />
+                <span class="inline-block rounded-full border border-line px-3 py-1 text-sm text-ink-2 transition-colors peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 hover:border-mute">
+                  {a.name} <span class="tnum text-xs opacity-60">{a.count}</span>
+                </span>
+              </label>
+            ))
+          }
+        </div>
+      </fieldset>
+    </div>
+
+    <details class="border-t border-line-2 px-5 py-4">
+      <summary class="cursor-pointer text-sm font-medium text-ink-2 hover:text-brand">
+        Tell us what else matters
+        <span class="font-normal text-mute">&mdash; we can't match on these yet</span>
+      </summary>
+
+      <p class="mt-3 max-w-[62ch] text-xs leading-relaxed text-mute">
+        None of this filters the results. We're asking because we don't hold the data yet, and what
+        people pick here decides what we go and find out next. Nothing you type is sent anywhere
+        &mdash; it stays in this browser tab.
+      </p>
+
+      <div class="mt-5 grid gap-x-8 gap-y-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
+        <fieldset class="flex flex-col gap-2">
+          <legend class="label mb-1">Transport</legend>
+          <label class="flex items-center gap-2 text-ink-2">
+            <input type="checkbox" name="want" value="walkable-transit" class="accent-brand" />
+            Must be walkable to LRT/MRT
+          </label>
+          <label class="flex items-center gap-2 text-ink-2">
+            Max walk
+            <input type="number" name="walk-max" min="0" class="tnum w-14 border-b border-line bg-transparent px-1 outline-none focus:border-brand" />
+            min
+          </label>
+        </fieldset>
+
+        <fieldset class="flex flex-col gap-2">
+          <legend class="label mb-1">Parking</legend>
+          <label class="flex items-center gap-2 text-ink-2">
+            <input type="checkbox" name="want" value="parking" class="accent-brand" /> Need a bay
+          </label>
+          <label class="flex items-center gap-2 text-ink-2">
+            How many
+            <input type="number" name="bays" min="0" class="tnum w-14 border-b border-line bg-transparent px-1 outline-none focus:border-brand" />
+          </label>
+        </fieldset>
+
+        <fieldset class="flex flex-col gap-2">
+          <legend class="label mb-1">Facilities</legend>
+          {
+            [
+              ['gym', 'Gym'],
+              ['pool', 'Pool'],
+              ['lift', 'Lift'],
+              ['visitor-parking', 'Visitor parking'],
+            ].map(([value, label]) => (
+              <label class="flex items-center gap-2 text-ink-2">
+                <input type="checkbox" name="want" value={value} class="accent-brand" />
+                {label}
+              </label>
+            ))
+          }
+        </fieldset>
+
+        <fieldset class="flex flex-col gap-2">
+          <legend class="label mb-1">Timing</legend>
+          <label class="flex flex-col gap-1 text-ink-2">
+            Move in
+            <input type="date" name="movein" class="border-b border-line bg-transparent pb-1 outline-none focus:border-brand" />
+          </label>
+          <label class="flex items-center gap-2 text-ink-2">
+            Lease
+            <input type="number" name="lease" min="1" class="tnum w-14 border-b border-line bg-transparent px-1 outline-none focus:border-brand" />
+            months
+          </label>
+        </fieldset>
+
+        <fieldset class="flex flex-col gap-2">
+          <legend class="label mb-1">The unit</legend>
+          <label class="flex items-center gap-2 text-ink-2">
+            <input type="checkbox" name="want" value="pets" class="accent-brand" /> Pets
+          </label>
+          <label class="flex flex-col gap-1 text-ink-2">
+            Floor or view
+            <input type="text" name="floor" placeholder="high floor, away from road…" class="border-b border-line bg-transparent pb-1 outline-none placeholder:text-mute/60 focus:border-brand" />
+          </label>
+        </fieldset>
+
+        <fieldset class="flex flex-col gap-2">
+          <legend class="label mb-1">Commute</legend>
+          <label class="flex flex-col gap-1 text-ink-2">
+            Workplace or regular destination
+            <input type="text" name="workplace" class="border-b border-line bg-transparent pb-1 outline-none focus:border-brand" />
+          </label>
+          <p class="text-xs leading-relaxed text-mute">
+            Stays in this browser. Never sent to us &mdash; a workplace plus a budget plus a move-in
+            date identifies a person even without a name on it.
+          </p>
+        </fieldset>
+      </div>
+    </details>
+
+    <div class="flex flex-wrap items-center gap-4 border-t border-line-2 px-5 py-4">
+      <button
+        id="f-go"
+        type="submit"
+        class="group inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
+      >
+        Score my shortlist
+        <span aria-hidden="true" class="transition-transform group-hover:translate-x-0.5">&rarr;</span>
+      </button>
+      <p id="count" class="tnum text-sm text-mute">{rows.length} units to choose from</p>
+      <button
+        id="f-reset"
+        type="reset"
+        class="ml-auto text-sm text-mute underline decoration-line underline-offset-4 hover:text-ink"
+      >
+        Start over
+      </button>
+    </div>
+  </form>
+
+  <p id="working" class="label mb-10 hidden animate-pulse">
+    Scoring {rows.length} units&hellip;
+  </p>
+
+  <!-- The picks. -->
+  <section id="results" class="mb-16 hidden scroll-mt-6">
+    <div class="mb-5 flex flex-wrap items-baseline justify-between gap-3 border-b border-line pb-3">
+      <h2 id="results-title" class="text-2xl font-bold tracking-[-0.03em]">Top picks</h2>
+      <button
+        id="how"
+        type="button"
+        class="label transition-colors hover:!text-brand"
+      >
+        How these were ranked &rarr;
+      </button>
+    </div>
+
+    <div id="how-panel" class="mb-6 hidden rounded border border-line bg-paper p-5">
+      <div class="grid gap-6 sm:grid-cols-2">
+        <div>
+          <p class="label mb-3">What the score is made of</p>
+          <ul class="flex flex-col gap-1.5">
+            {
+              WEIGHTS.map((w) => (
+                <li class="flex items-baseline justify-between gap-3 text-sm text-ink-2">
+                  <span>{w.label}</span>
+                  <span class="tnum font-mono text-xs text-mute">{w.weight}</span>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+        <div>
+          <p class="label mb-3">Not scored &mdash; we hold no data</p>
+          <ul class="flex flex-col gap-1.5">
+            {
+              UNSCORED.map(([label, weight]) => (
+                <li class="flex items-baseline justify-between gap-3 text-sm text-mute">
+                  <span>{label}</span>
+                  <span class="tnum font-mono text-xs">asked for {weight}</span>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+      <p class="mt-5 max-w-[70ch] border-t border-line-2 pt-4 text-xs leading-relaxed text-mute">
+        There are no coordinates, no facilities field and no points-of-interest data, so a weight on
+        any of those three would move nothing. They are listed rather than quietly dropped.
+      </p>
+    </div>
+
+    <div id="cards" class="grid gap-5 lg:grid-cols-2">
+      {
+        rows.map(({ l, estimate, delta }) => (
+          <article
+            class="group flex flex-col overflow-hidden rounded border border-line bg-paper"
+            data-slug={l.buildingSlug}
+            data-area={l.area}
+            data-beds={l.beds}
+            data-price={l.priceMyr}
+            data-sqft={l.sqft}
+            data-psf={l.pricePsf.toFixed(4)}
+            data-year={l.completionYear ?? 0}
+            data-units={l.totalUnits ?? 999999}
+            data-delta={delta === null ? 999 : delta.toFixed(4)}
+            data-value={l.value && l.value.band !== 'check' ? l.value.cheaperThan : -1}
+          >
+            <div class="h-0.5 w-full bg-brand"></div>
+
+            <div class="flex items-baseline justify-between gap-3 border-b border-line-2 px-5 py-2.5">
+              <span class="label flex items-center gap-2">
+                <span class="size-1.5 rounded-full bg-brand"></span>
+                <span class="rank">Match</span>
+              </span>
+              <span class="label tnum">{l.area}</span>
+            </div>
+
+            <div class="flex flex-col gap-4 px-5 py-5">
+              <div>
+                <div class="flex items-baseline justify-between gap-3">
+                  <a
+                    href={`/building/${l.buildingSlug}`}
+                    class="text-xl font-bold tracking-[-0.02em] hover:text-brand"
+                  >
+                    {l.buildingName}
+                  </a>
+                  {l.sample && (
+                    <span class="label rounded bg-flag-tint px-1.5 py-0.5 !text-flag">sample</span>
+                  )}
+                </div>
+                <p class="label mt-1.5">
+                  {bedLabel(l.beds)} &middot; {l.baths} bath &middot; {sqftLabel(l.sqft)}
+                  {l.completionYear && <> &middot; {l.completionYear}</>}
+                  {l.totalUnits && <> &middot; {l.totalUnits.toLocaleString('en-MY')} units</>}
+                </p>
+              </div>
+
+              <div class="grid grid-cols-[auto_1fr] items-end gap-x-8 border-t border-dashed border-line pt-4">
+                <div>
+                  <p class="label mb-1">Match score</p>
+                  <p class="flex items-baseline gap-1">
+                    <span class="match tnum text-[2.75rem] leading-none font-bold tracking-[-0.04em]">&mdash;</span>
+                    <span class="font-mono text-xs text-mute">/100</span>
+                  </p>
+                </div>
+                <div class="text-right">
+                  <p class="label mb-1">Asking rent</p>
+                  <p class="tnum text-2xl leading-none font-semibold">{myr(l.priceMyr)}</p>
+                  <p class="tnum mt-1 font-mono text-xs text-mute">{psf(l.pricePsf)}</p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <span class="h-[3px] w-24 overflow-hidden rounded-full bg-line">
+                  <span class="conf-bar block h-full rounded-full bg-brand" style="width:0%"></span>
+                </span>
+                <span class="conf-text font-mono text-xs text-mute"></span>
+              </div>
+
+              <div class="flex flex-col gap-1.5 border-t border-dashed border-line pt-4">
+                {
+                  WEIGHTS.map((w) => (
+                    <div class="factor grid grid-cols-[1fr_auto_auto] items-center gap-3" data-key={w.key}>
+                      <span class="truncate text-sm text-ink-2">{w.label}</span>
+                      <span class="h-[3px] w-16 overflow-hidden rounded-full bg-line-2 sm:w-24">
+                        <span class="f-bar block h-full rounded-full bg-ink" style="width:0%"></span>
+                      </span>
+                      <span class="f-val tnum w-12 text-right font-mono text-xs text-ink-2"></span>
+                    </div>
+                  ))
+                }
+              </div>
+
+              <div class="why-wrap hidden gap-3 border-t border-dashed border-line pt-4">
+                <span class="label shrink-0 !text-brand">Why</span>
+                <p class="why text-sm leading-relaxed text-ink-2"></p>
+              </div>
+
+              {estimate && (
+                <p class="tnum font-mono text-xs text-mute">
+                  Est. {myr(estimate.rent)} &middot; {estimate.cohort} similar &middot; {myr(estimate.low)}&ndash;{myr(estimate.high)}
+                </p>
+              )}
+
+              {l.unknownFacts.length > 0 && (
+                <p class="flex flex-wrap items-baseline gap-2 border-t border-line-2 pt-3">
+                  <span class="label">Not known</span>
+                  <span class="text-xs text-mute">{l.unknownFacts.join('  ·  ')}</span>
+                </p>
+              )}
+            </div>
+
+            <a
+              href={l.sourceUrl}
+              rel="noopener nofollow"
+              target="_blank"
+              class="mt-auto flex items-center justify-between gap-2 border-t border-line-2 px-5 py-3.5 text-sm font-semibold transition-colors hover:bg-tint hover:text-brand"
+            >
+              <span>Contact on <span class="capitalize">{l.source}</span></span>
+              <span aria-hidden="true" class="transition-transform group-hover:translate-x-0.5">&rarr;</span>
+            </a>
+          </article>
+        ))
+      }
+    </div>
+
+    <p id="empty" class="hidden py-8 text-center text-sm text-mute">
+      Nothing matches that. Try raising the budget or adding an area.
+    </p>
+
+    <button
+      id="more"
+      type="button"
+      class="mt-6 hidden w-full rounded border border-line bg-paper py-3 text-sm font-medium text-ink-2 transition-colors hover:border-brand hover:text-brand"
+    >
+    </button>
+  </section>
+
+  <!-- The development-level view. Still the thing that makes the site credible. -->
+  <section>
+    <div class="mb-5 flex flex-wrap items-baseline justify-between gap-3 border-b border-line pb-3">
+      <h2 class="text-2xl font-bold tracking-[-0.03em]">All developments</h2>
+      <span class="label">{buildings.length} in {areas}</span>
+    </div>
+
+    <div class="overflow-x-auto rounded border border-line bg-paper">
+      <table class="w-full min-w-[46rem] text-left text-sm">
+        <thead>
+          <tr class="border-b border-line">
+            <th class="label px-5 py-3 font-normal">Development</th>
+            <th class="label px-5 py-3 font-normal">Median rent</th>
+            <th class="label px-5 py-3 font-normal">Per sqft</th>
+            <th class="label px-5 py-3 font-normal">Maintenance</th>
+            <th class="label px-5 py-3 font-normal">Walk to LRT</th>
+            <th class="label px-5 py-3 font-normal">Listings</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            buildings.map((b) => (
+              <tr class="border-b border-line-2 last:border-0 hover:bg-sand">
+                <td class="px-5 py-3">
+                  <a href={`/building/${b.slug}`} class="font-semibold hover:text-brand">
+                    {b.name}
+                  </a>
+                  {b.sample && (
+                    <span class="label ml-2 rounded bg-flag-tint px-1.5 py-0.5 !text-flag">sample</span>
+                  )}
+                  <div class="label mt-0.5">{b.area}</div>
+                </td>
+                <td class="tnum px-5 py-3">{myr(b.metrics.medianRentMyr)}</td>
+                <td class="tnum px-5 py-3 text-ink-2">{psf(b.metrics.medianPsf)}</td>
+                <td class="tnum px-5 py-3">
+                  {b.facts.maintenancePsf === null ? (
+                    <span class="text-mute">&mdash;</span>
+                  ) : (
+                    <>
+                      {psf(b.facts.maintenancePsf)}
+                      {/*
+                        A fee nobody corroborated is marked here as well as on the
+                        building page. This table is what gets compared, and an
+                        unmarked column invites reading a forum post and a
+                        management notice as the same kind of number.
+                      */}
+                      {b.factSources?.maintenancePsf?.confidence === 'unverified' && (
+                        <span
+                          class="ml-1 text-flag"
+                          title={`One source, not corroborated: ${b.factSources.maintenancePsf.sources.join(', ')} — checked ${b.factSources.maintenancePsf.checkedAt}`}
+                        >
+                          ?
+                        </span>
+                      )}
+                    </>
+                  )}
+                </td>
+                <td class="tnum px-5 py-3">
+                  {b.facts.walkMinutesToStation === null ? (
+                    <span class="text-mute">&mdash;</span>
+                  ) : (
+                    `${b.facts.walkMinutesToStation} min`
+                  )}
+                </td>
+                <td class="tnum px-5 py-3">
+                  {b.metrics.listingCount}
+                  {isLowConfidence(b.metrics.listingCount) && (
+                    <span
+                      class="label ml-2 rounded bg-line-2 px-1.5 py-0.5"
+                      title="Fewer than 5 units — treat the median as indicative only"
+                    >
+                      low
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
 </Base>
+
+<script>
+  // Every card is already in the page, so this filters, scores and reorders in
+  // place. No requests, and nothing typed here leaves the browser — including
+  // the fields in the disclosure, which are read by nothing at all.
+  const grid = document.getElementById('cards') as HTMLElement;
+  const cards = Array.from(grid.querySelectorAll('article'));
+  const count = document.getElementById('count') as HTMLElement;
+  const empty = document.getElementById('empty') as HTMLElement;
+  const form = document.getElementById('finder') as HTMLFormElement;
+  const results = document.getElementById('results') as HTMLElement;
+  const working = document.getElementById('working') as HTMLElement;
+  const title = document.getElementById('results-title') as HTMLElement;
+  const more = document.getElementById('more') as HTMLButtonElement;
+  const how = document.getElementById('how') as HTMLButtonElement;
+  const howPanel = document.getElementById('how-panel') as HTMLElement;
+
+  const max = document.getElementById('f-max') as HTMLInputElement;
+  const sortBy = document.getElementById('f-sort') as HTMLSelectElement;
+
+  const PICKS = 3;
+  let expanded = false;
+
+  const num = (card: HTMLElement, key: string) => Number(card.dataset[key]);
+
+  /** Checked values for one checkbox group; empty means "no restriction". */
+  const picked = (name: string) =>
+    new Set(
+      Array.from(form.querySelectorAll<HTMLInputElement>(`input[name="${name}"]:checked`)).map(
+        (el) => el.value,
+      ),
+    );
+
+  const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
+
+  type Scored = { card: HTMLElement; score: number };
+
+  /**
+   * Position within the matching set, 0 worst and 1 best.
+   *
+   * Scored against the units actually on offer rather than a fixed scale,
+   * because "RM1.80/sqft" means nothing on its own — it is only cheap or dear
+   * next to the other things you could rent instead. Everything collapses to a
+   * neutral 0.5 when the set is uniform, so a factor nobody can distinguish on
+   * does not silently decide the ranking.
+   */
+  const scale = (v: number, lo: number, hi: number) => (hi === lo ? 0.5 : (v - lo) / (hi - lo));
+
+  /** The weights, mirrored from WEIGHTS in the frontmatter. Keep the two in step. */
+  const W = { below: 40, psf: 15, budget: 15, size: 10, age: 10, density: 10 };
+
+  /**
+   * Past this far below the estimate, cheapness stops being evidence of a bargain.
+   *
+   * Mirrors SUSPICIOUSLY_CHEAP in scripts/derive.mjs, which marks these `check`
+   * rather than crowning them — a mis-keyed floor area, a room advertised as a
+   * unit, or bait. Without this the ranker does the opposite of the rest of the
+   * site and puts the least trustworthy listing first, which is how the two
+   * Empire City studios `/listings` sinks came top of the picks.
+   *
+   * scripts/check-publishable.mjs fails the build if the two drift apart.
+   */
+  const SUSPICIOUSLY_CHEAP = -0.3;
+
+  function apply(reveal = false) {
+    const cap = Number(max.value) || Infinity;
+    const beds = picked('beds');
+    const areas = picked('area');
+
+    const matched = cards.filter(
+      (card) =>
+        num(card, 'price') <= cap &&
+        (beds.size === 0 || beds.has(card.dataset.beds!)) &&
+        (areas.size === 0 || areas.has(card.dataset.area!)),
+    );
+
+    // Ranges are taken over the matching set only, so the score answers "best of
+    // what you asked for" rather than "best in Petaling Jaya".
+    const range = (key: string, from = matched) => {
+      const vs = from.map((c) => num(c, key)).filter((n) => Number.isFinite(n));
+      return [Math.min(...vs), Math.max(...vs)] as const;
+    };
+    const [psfLo, psfHi] = range('psf');
+    const [sqLo, sqHi] = range('sqft');
+    const [yrLo, yrHi] = range('year', matched.filter((c) => num(c, 'year') > 0));
+    const [unLo, unHi] = range('units', matched.filter((c) => num(c, 'units') < 999999));
+
+    const scored = matched.map((card) => {
+      const delta = num(card, 'delta');
+      const value = num(card, 'value');
+      const hasYear = num(card, 'year') > 0;
+      const hasUnits = num(card, 'units') < 999999;
+
+      // 20% under the estimate is full marks, but only up to the point where the
+      // discount stops being credible. Beyond that the unit is penalised rather
+      // than rewarded, because the claim it makes about itself is the problem.
+      const suspect = delta !== 999 && delta < SUSPICIOUSLY_CHEAP;
+      const backed = delta !== 999 || value >= 0;
+      const below = suspect ? 0.2 : delta !== 999 ? clamp01(-delta / 0.2) : value >= 0 ? value : 0.5;
+
+      const f = {
+        below,
+        psf: 1 - clamp01(scale(num(card, 'psf'), psfLo, psfHi)),
+        budget: cap === Infinity ? 0.5 : clamp01((cap - num(card, 'price')) / cap),
+        size: clamp01(scale(num(card, 'sqft'), sqLo, sqHi)),
+        age: hasYear ? clamp01(scale(num(card, 'year'), yrLo, yrHi)) : 0.5,
+        density: hasUnits ? 1 - clamp01(scale(num(card, 'units'), unLo, unHi)) : 0.5,
+      };
+
+      const score = (Object.keys(W) as Array<keyof typeof W>).reduce((t, k) => t + f[k] * W[k], 0);
+
+      /**
+       * How much of the score rests on something we actually know.
+       *
+       * Every factor that falls back to a neutral 0.5 is a factor nobody
+       * measured, and its weight is subtracted here. It is the same discipline
+       * as the `unverified` tag on a fact: the number is shown, and so is how
+       * much of it is guesswork.
+       */
+      const confidence =
+        100 -
+        (backed ? 0 : W.below) -
+        (cap === Infinity ? W.budget : 0) -
+        (hasYear ? 0 : W.age) -
+        (hasUnits ? 0 : W.density);
+
+      return { card, score, f, delta, suspect, confidence };
+    });
+
+    /**
+     * The match score is the default order, and the select overrides it.
+     *
+     * Kept as an override rather than a weight: someone who picks "rent, lowest
+     * first" is asking a different question, not nudging the same one. Ties fall
+     * back to the cheaper unit so the top of any list is never arbitrary.
+     */
+    const cheaper = (a: Scored, b: Scored) => num(a.card, 'price') - num(b.card, 'price');
+    const orders: Record<string, (a: Scored, b: Scored) => number> = {
+      'value-desc': (a, b) => num(b.card, 'value') - num(a.card, 'value') || cheaper(a, b),
+      'price-asc': cheaper,
+      'psf-asc': (a, b) => num(a.card, 'psf') - num(b.card, 'psf'),
+      'year-desc': (a, b) => num(b.card, 'year') - num(a.card, 'year') || cheaper(a, b),
+      'units-asc': (a, b) => num(a.card, 'units') - num(b.card, 'units') || cheaper(a, b),
+    };
+    scored.sort(orders[sortBy.value] ?? ((a, b) => b.score - a.score || cheaper(a, b)));
+
+    /**
+     * The shortlist takes at most one unit per development.
+     *
+     * Without this, three picks routinely means the same block three times —
+     * Empire Damansara holds 36 units and its best three score within a point of
+     * each other. Three near-identical units is one recommendation wearing three
+     * hats, and the reader came here to choose between buildings. The cap lifts
+     * once the full list is expanded, where seeing every unit is the point.
+     */
+    const seen = new Set<string>();
+    const shortlist = new Set<HTMLElement>();
+    if (!expanded) {
+      for (const s of scored) {
+        const slug = s.card.dataset.slug!;
+        if (seen.has(slug)) continue;
+        seen.add(slug);
+        shortlist.add(s.card);
+        if (shortlist.size >= PICKS) break;
+      }
+    }
+
+    for (const card of cards) card.hidden = true;
+
+    let shown = 0;
+    for (const s of scored) {
+      grid.appendChild(s.card);
+      s.card.hidden = expanded ? false : !shortlist.has(s.card);
+      if (s.card.hidden) continue;
+      const i = shown++;
+
+      const q = <T extends Element>(sel: string) => s.card.querySelector(sel) as T;
+
+      q<HTMLElement>('.rank').textContent = `No. ${String(i + 1).padStart(2, '0')}`;
+      q<HTMLElement>('.match').textContent = `${Math.round(s.score)}`;
+
+      q<HTMLElement>('.conf-bar').style.width = `${s.confidence}%`;
+      q<HTMLElement>('.conf-text').textContent = `${s.confidence}% backed by data`;
+
+      // Each factor's actual contribution, so the score can be argued with.
+      for (const row of Array.from(s.card.querySelectorAll<HTMLElement>('.factor'))) {
+        const key = row.dataset.key as keyof typeof W;
+        const share = s.f[key];
+        (row.querySelector('.f-bar') as HTMLElement).style.width = `${Math.round(share * 100)}%`;
+        (row.querySelector('.f-val') as HTMLElement).textContent = `+${(share * W[key]).toFixed(1)}`;
+      }
+
+      const wrap = q<HTMLElement>('.why-wrap');
+      const why = q<HTMLElement>('.why');
+      if (s.suspect) {
+        why.textContent = `Asking ${Math.abs(Math.round(s.delta * 100))}% under comparable units here — far enough below to be worth checking the floor area before anything else`;
+        why.className = 'why text-sm leading-relaxed text-flag';
+      } else {
+        const reasons: Array<[number, string]> = [
+          [
+            s.f.below,
+            s.delta !== 999 && s.delta < -0.03
+              ? `About ${Math.abs(Math.round(s.delta * 100))}% under comparable units here`
+              : 'Priced well against comparable units in the same block',
+          ],
+          [s.f.psf, 'Among the cheapest per square foot of everything you asked for'],
+          [s.f.size, 'One of the larger units matching your filters'],
+          [s.f.age, 'One of the newer buildings matching your filters'],
+          [s.f.density, 'A lower-density development than most of the others here'],
+        ];
+        reasons.sort((a, b) => b[0] - a[0]);
+        why.textContent = reasons[0][0] > 0.55 ? reasons[0][1] : '';
+        why.className = 'why text-sm leading-relaxed text-ink-2';
+      }
+      wrap.classList.toggle('hidden', !why.textContent);
+      wrap.classList.toggle('flex', !!why.textContent);
+    }
+
+    const n = scored.length;
+    count.textContent = `${n} unit${n === 1 ? '' : 's'} match`;
+    empty.classList.toggle('hidden', n > 0);
+    title.textContent = expanded
+      ? `All ${n} matches, best first`
+      : `Top ${shortlist.size} pick${shortlist.size === 1 ? '' : 's'}, one per development`;
+
+    // Toggle the class, not the property: the markup carries Tailwind's `hidden`,
+    // which sets display:none and beats the DOM property every time.
+    more.classList.toggle('hidden', !expanded && n <= shortlist.size);
+    more.textContent = expanded ? `Back to the top ${PICKS}` : `Show all ${n} matches`;
+
+    if (reveal) results.classList.remove('hidden');
+  }
+
+  /**
+   * Submit runs the same computation, staged behind a brief working state.
+   *
+   * The delay is not the scoring — that is instant on 301 rows. It is there so a
+   * resubmitted form visibly produces a new answer rather than silently swapping
+   * three cards, which reads as nothing having happened.
+   */
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    expanded = false;
+    results.classList.add('hidden');
+    working.classList.remove('hidden');
+    setTimeout(() => {
+      working.classList.add('hidden');
+      apply(true);
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 450);
+  });
+
+  // Re-rank in place once results are up, so tweaking a filter is immediate.
+  const live = () => {
+    if (!results.classList.contains('hidden')) apply();
+  };
+  form.addEventListener('change', live);
+  form.addEventListener('input', live);
+
+  form.addEventListener('reset', () =>
+    setTimeout(() => {
+      expanded = false;
+      results.classList.add('hidden');
+      apply();
+    }),
+  );
+
+  more.addEventListener('click', () => {
+    expanded = !expanded;
+    apply();
+  });
+
+  how.addEventListener('click', () => howPanel.classList.toggle('hidden'));
+
+  apply();
+</script>
